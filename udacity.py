@@ -210,12 +210,13 @@ def lowest_post_order(S, root, po):
     # lowest post order down that branch regardless of sub branches
 
     lpo = {}
+    
     # make list length of po dict, then insert each key into it in the order based on its po value
     ordered_po = ["" for _ in range(len(po))]
     for node in po:
         # replace the list item at the index of the node's post order value
-        del ordered_po[po[node] - 1]  # index = post order value - 1
-        ordered_po.insert(po[node] - 1, node)
+        ordered_po[po[node] - 1] = node  # index = post order value - 1
+        
     # loop through all nodes in post order using the ordered list
     for curr_node in ordered_po:
         node_lpo = po[curr_node]
@@ -260,8 +261,7 @@ def highest_post_order(S, root, po):
     ordered_po = ["" for _ in range(len(po))]
     for node in po:
         # replace the list item at the index of the node's post order value
-        del ordered_po[po[node] - 1]  # index = post order value - 1
-        ordered_po.insert(po[node] - 1, node)
+        ordered_po[po[node] - 1] = node  # index = post order value - 1
 
     # use sorted list to run through nodes in post order
     for node in ordered_po:
