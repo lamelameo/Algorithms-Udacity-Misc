@@ -20,12 +20,32 @@ def langtons_ant(grid, column, row, n, direction=0):
         # change position to opposite colour
         grid[row][column] = 1 - position_colour
 
-        # TODO: alternate method to determine direction, variable increases infintely...
-        # if position_colour == 1:  # white - rotate clockwise
-        #     direction = (direction + 2 * position_colour - 1) % 4
-        # elif position_colour == 0:  # black - rotate counter clockwise
-        #     direction = 4 - (direction + 2 * position_colour - 1) % 4
-
+        # TODO: simple method to change direction...
+        # if position_colour:  # white
+        #     direction += 1
+        #     if direction == 4:
+        #         direction = 0
+        # else:  # black
+        #     direction -= 1
+        #     if direction == -1:
+        #         direction = 3
+        
+        # TODO: alternate method to determine direction using modulo
+        # if position_colour == 1:  # white
+        #     direction = (direction + 1) % 4
+        # elif position_colour == 0:  # black
+        #     direction = 4 - (direction - 1) % 4
+        
+        # TODO: 1 liners with more math, equivalent to the above operations with modulo
+        # (1 - position_colour) leads to switching colour value: white (1) -> 0, black (0) -> 1
+        # (2 * position_colour - 1) leads to increment/decrement: white(1) -> +1, black(0) -> -1
+        # absolute value because 0 - (0-3) is negative
+        # direction = abs(4 * (1 - position_colour) - ((direction + 2 * position_colour - 1) % 4))
+        # +4 before % operation has no effect on the new direction after incr./decr. if it is 0-3 e.g. (4 + d=1) % 4 = 1
+        # but if we increment to 4 or decrement to -1  we get the correct changes: (4 + d=4) % 4 = 0, (4 + d=-1) % 4 = 3 
+        # direction = (4 + direction + 2 * position_colour - 1) % 4
+        # direction = (3 + direction + 2 * position_colour) % 4
+        
         # Change ants position
         if direction == 0:  # north
             row -= 1
