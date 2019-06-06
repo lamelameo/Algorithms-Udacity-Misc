@@ -44,7 +44,7 @@ def create_rooted_spanning_tree(G, root):
     S = {}
     node_stack = [root]
     S[root] = {}
-    # TODO: can replace not in with dict.get() which returns None if no value for that key, is faster
+    # TODO: can replace not in with dict.get() which returns None if no value for that key, is faster?
     # iterate through Graph nodes starting at the given root, going depth first through neighbours using a stack
     while node_stack:  # will end when stack is empty
         curr_node = node_stack.pop()
@@ -210,13 +210,11 @@ def lowest_post_order(S, root, po):
     # lowest post order down that branch regardless of sub branches
 
     lpo = {}
-    
     # make list length of po dict, then insert each key into it in the order based on its po value
     ordered_po = ["" for _ in range(len(po))]
     for node in po:
         # replace the list item at the index of the node's post order value
-        ordered_po[po[node] - 1] = node  # index = post order value - 1
-        
+        ordered_po[po[node] - 1] = node
     # loop through all nodes in post order using the ordered list
     for curr_node in ordered_po:
         node_lpo = po[curr_node]
@@ -261,7 +259,7 @@ def highest_post_order(S, root, po):
     ordered_po = ["" for _ in range(len(po))]
     for node in po:
         # replace the list item at the index of the node's post order value
-        ordered_po[po[node] - 1] = node  # index = post order value - 1
+        ordered_po[po[node] - 1] = node
 
     # use sorted list to run through nodes in post order
     for node in ordered_po:
@@ -315,7 +313,6 @@ def bridge_edges(G, root):
     for node in st:
         # if these relationships are both true, then the green edge that ends on this node is a bridge
         if (hpo[node] <= po[node]) and (lpo[node] > abs(nd[node] - po[node])):
-            print(node)
             # get the node's neighbour on the other end of this bridge edge, using post order
             for neighbour in st[node]:
                 # the neighbour will have higher post order, and be green
@@ -339,5 +336,433 @@ def test_bridge_edges():
     assert bridges == [('d', 'e')]
 
 
-test_bridge_edges()
+def create_combo_lock(nodes):
+    # nodes is a list of integers
+    G = {}
+    first_node = nodes[0]
+    prev_node = None
+    for node in nodes:
+        # exclude first node, as it has no previous node
+        if prev_node is not None:
+            # make link between each node to form chain, and add link to first node for each, to make loops
+            make_link(G, prev_node, node)
+            make_link(G, node, first_node)
+        # update prev node to current for next loop
+        prev_node = node
+    return G
+
+
+# Write partition to return a new array with
+# all values less then `v` to the left
+# and all values greater then `v` to the right
+def partition(L, v):
+    P = []
+    higher_list = []
+    num_v = 0
+    for item in L:
+        if v > item:
+           P.append(item)  # adds item to lesser side of new list (unordered)
+        elif v < item:
+            higher_list.append(item)  # add to higher side list
+        elif v == item:
+            num_v += 1
+    # what if the item is equal to v? I have just added them all to middle of two partitions...
+    for _ in range(num_v):
+        P.append(v)
+    P += higher_list
+    print(P)
+    return P
+
+
+def rank(L, v):
+    pos = 0
+    for val in L:
+        if val < v:
+            pos += 1
+    return pos
+
+
+import random as rand
+def top_k(L, k):
+    # a recursive algorithm to find the top/bottom k values (unsorted) in a list using randomly chosen pivots
+    v = L[rand.randrange(len(L))]
+    # TODO: does not handle doubled values, must look to change here and partition
+    (left, middle, right) = partition(L, v)
+    # if lower list = k, then we have found all k values, with v being 1 above that
+    if len(left) == k: return left
+    # if lower list + 1 = k then, the lower list + v constitutes all k values
+    if len(left)+1 == k: return left+[v]
+    # if lower list is larger than k, then we have too many values, and recursively call this function
+    # still using value k to partition the lower list to make it smaller, till it reaches length k
+    if len(left) > k: return top_k(left,k)
+    # if lower list is smaller than k, then we have too few values, and recursively call the function
+    # using a k value lowered by the length of the left list to start a new partition on the right list
+    # till the length of the new lower list added to length of original lower list = k
+    return left+[v]+top_k(right, k-len(left)-1)
+
+
+def median(L):
+    sums = []
+    square_sums = []
+    for item in L:
+        sum1 = 0
+        square = 0
+        for item2 in L:
+            sum1 += abs(item - item2)
+            square += (item - item2)**2
+        sums.append(sum1)
+        square_sums.append(square)
+    print("L", L)
+    print("sorted", sorted(L))
+    print("sums", sums)
+    print("squares", square_sums)
+
+# median([2,5,9,19,24,5,9,10,54,87,2,13,21,32,44,4,16,18,19,26,25,39,47,56,71])
+# print(sorted([2,5,9,19,24,5,9,10,54,87,2,13,21,32,44,4,16,18,19,26,25,39,47,56,71]))
+# median([2,2,3,4,2])
+
+
+from math import ceil
+
+def minimize_absolute(L):
+    # this is same as finding the median in the sorted list, which we can get by partitioning to
+    # find lowest k values, where k = list size/2, essentially splitting list in half,
+    # then we search the list for the highest value which will be the median
+    # this takes n operations for the top_k part and 1/2n operations to find max in the return list
+
+    # if list is even, will take the lower of two middle values, if odd, ceil gives middle value
+    length_list = len(L)
+    half_vals = ceil(length_list / float(2))  # used float as udacity seems to not cast this to a float automatically
+    lower_half = top_k(L, half_vals)
+    median = lower_half[0]
+    # get highest value in list, which is the median
+    for val in lower_half:
+        if val > median:
+            median = val
+    return median
+
+
+#
+# Given a list of numbers, L, find a number, x, that
+# minimizes the sum of the square of the difference
+# between each element in L and x: SUM_{i=0}^{n-1} (L[i] - x)^2
+#
+# Your code should run in Theta(n) time
+#
+
+def minimize_square(L):
+    # f(x) = sum(to n) (L[i] - x)**2
+    # g(x) = x**2, h(x) = L[i] - x
+    # g'(x) = 2x, h'(x) = -1
+    # f'(x) = sum (g'(h(x)) . h'(x))
+    #       = sum 2(L[i] - x).(-1)
+    #       = sum -2(L[i] - x)
+    # minimum f(x) is when f'(x) = 0, or minimise f(x) as f'(x) approaches 0
+    # therefore: 0 = -2 sum(L[i] - x)
+    #            0 = sum(L[i) - nx  (sum is same as adding all elements and subtracting x, n times)
+    #           nx = sum L[i]
+    #            x = (sum L[i])/n
+    # This is the average value of the list, so to minimise f(x), find x that is closest to the average
+    # can do this in two loops, 2n operations, Theta(n) time
+    average = 0
+    for item in L:
+        average += item
+    average /= len(L)
+    print("average", average)
+    smallest_diff = abs(average - L[0])
+    x = 0
+    for item in L:
+        diff = abs(average - item)
+        if diff < smallest_diff:
+            x = item
+            smallest_diff = diff
+    return x
+
+
+#
+# Given a list L of n numbers, find the mode
+# (the number that appears the most times).
+# Your algorithm should run in Theta(n).
+# If there are ties - just pick one value to return
+#
+
+def mode(L):
+    # use a dictionary to save the frequencies of each item using the item as the key
+    # increasing frequency by 1 if the key already exists, or making a value of 1 if not
+    # then check each key in the dictionary (which could be same length as list or a lot smaller)
+    # keep track of the key for highest value seen so far, once checked all frequencies, then the key
+    # we have is the item (or one of multiple) in the list with most frequency ie the mode
+
+    frequencies = {}
+    # TODO: could keep track of highest frequency as we go through the list, then we only need one pass to create the
+    # dict of frequencies and return the max value...
+    mode = 0
+    for item in L:
+        if item not in frequencies:
+            frequencies[item] = 1
+        else:
+            frequencies[item] += 1
+            if frequencies[item] > mode:
+                mode = frequencies[item]
+    # return mode
+
+    # initialise the mode key arbitrarily to first item in list (it will be updated if it isnt the mode)
+    mode_key = L[0]
+    for value in frequencies:
+        # determine if the current highest is lower than the value we are currently checking
+        if frequencies[value] > frequencies[mode_key]:
+            mode_key = value
+    return mode_key
+
+
+def up_heapify1(L):
+    # up heapify all values, iterate backwards through the list ie start with bottom node and move up to top of heap
+    reverse_index = 0
+    length = len(L)
+    for _ in range(length):
+        # check nodes children (min 0, max 2)
+        # normal index(i) = length + reverse index
+        # child1 index = 2i + 1, child2_ind = 2i + 2
+        # reverse child1 index = child1 index - length
+        #                      = 2i + 1 - length
+        #                      = 2(length + reverse index) + 1 - length
+        #                   c1 = length + 2*reverse index + 1, c2 = length + 2*reverse index + 2
+        reverse_index -= 1
+        child1_ind = length + 2 * reverse_index + 1
+        child2_ind = length + 2 * reverse_index + 2
+        print("rev index:", reverse_index)
+        print(child1_ind)
+        print(child2_ind)
+
+        if child1_ind > -1:  # any node that has no children will have child index outside the range ie 0 or higher
+            continue  # ignore these nodes and continue up the heap list
+
+        # check if each child's value is less than the node, if so then swap the values
+        # taking account of 1st change, if any, for the 2nd child
+        node = L[reverse_index]
+        child1 = L[child1_ind]
+        child2 = L[child2_ind]
+        if node > child1:  # must swap child and node
+            print("node", node)
+            print("child1", child1)
+            L[reverse_index] = child1
+            L[child1_ind] = node
+
+        if child2_ind > -1:  # could have a left child but no right child, move to next
+            continue
+        if node > child2:  # check
+            print("node", node)
+            print("child2", child2)
+            L[reverse_index] = child2
+            L[child2_ind] = node
+    return L
+
+
+#
+# write up_heapify, an algorithm that checks if
+# node i and its parent satisfy the heap
+# property, swapping and recursing if they don't
+#
+# L should be a heap when up_heapify is done
+#
+def up_heapify(L, i):
+    # if parent of node i has a greater value than i, swap the values and recurse, else return the List as it is a heap
+    # if node i reaches top of heap, the parent will be itself, and fail the comparison and return the valid heap
+    # TODO: fails in udacity as it runs python 2, added an if statement to return L once top of heap is reached...
+    if i == 0:
+        return L
+    node = L[i]
+    print("parent", int(parent(i)))
+    parent_index = int(parent(i))
+    parent_node = L[parent_index]
+    print(node, parent_node)
+    if node < parent_node:
+        print(node, parent_node)
+        L[parent_index] = node
+        L[i] = parent_node
+        return up_heapify(L, parent_index)
+    else:
+        return L
+
+
+def dijk_up_heapify(L, values, indexes, i):
+    # takes a heap as a list of node keys, a dict of the corresponding values for the keys, a dict containing the
+    # indexes of those nodes in the heap, and a reference node index and makes appropriate swaps for node i and parents
+    # recursively till list is a heap, returning the list and dict of indexes which may have been altered.
+    # The indexes must be updated as the nodes are moved in the heap, since we must know
+    # their position to up heapify correctly if a new shorter path is found and its value is updated
+    if i == 0:
+        return L, indexes
+    print("i", i)
+    print("values", values)
+    print("indexes", indexes)
+    node = L[i]
+    parent_index = int(parent(i))
+    print("parent index: ", parent_index)
+    parent_node = L[parent_index]
+    if values[node] < values[parent_node]:
+        # swap keys in heap
+        L[parent_index] = node
+        L[i] = parent_node
+        # swap heap index in dict
+        indexes[node] = parent_index
+        indexes[parent_node] = i
+        return dijk_up_heapify(L, values, indexes, parent_index)
+    else:
+        return L, indexes
+
+
+def parent(i):
+    return (i - 1) / 2
+
+
+def left_child(i):
+    return 2 * i + 1
+
+
+def right_child(i):
+    return 2 * i + 2
+
+
+def is_leaf(L, i):
+    return (left_child(i) >= len(L)) and (right_child(i) >= len(L))
+
+
+def one_child(L, i):
+    return (left_child(i) < len(L)) and (right_child(i) >= len(L))
+
+
+def make_link_weighted(G, node1, node2, w):
+    if node1 not in G:
+        G[node1] = {}
+    if node2 not in G[node1]:
+        (G[node1])[node2] = 0
+    (G[node1])[node2] += w
+    if node2 not in G:
+        G[node2] = {}
+    if node1 not in G[node2]:
+        (G[node2])[node1] = 0
+    (G[node2])[node1] += w
+    return G
+
+
+def down_heapify(L, values, indexes, i):
+    # Is used to create a heap given a List which is a heap except for a node i and its direct children.
+    # Recursively check if node i is larger than its children and swap with the smaller of either till
+    # the node is in its correct position and the list is now a heap. Returns the updated heap and indexes.
+    # Takes a list of node keys, a dict of corresponding values, a dict of node indexes in the heap, and index of
+    # the node to down heapify from. Must update the node indexes as they are changed.
+
+    # if i is a leaf, it is a heap
+    if is_leaf(L,i):
+        return L, indexes
+    # if i has one child check heap property, and swap values if necessary
+    if one_child(L,i):
+        if values[L[i]] > values[L[left_child(i)]]:
+            # swap values
+            (L[i], L[left_child(i)]) = (L[left_child(i)], L[i])
+            # swap indexes
+            (indexes[L[i]], indexes[L[left_child(i)]]) = (indexes[L[left_child(i)]], indexes[L[i]])
+        return L, indexes
+    # if i has two direct children check if the smaller is higher than i, if it is then return, if not
+    # then we have to swap the smaller of two values
+    if min(values[L[left_child(i)]], values[L[right_child(i)]]) >= values[L[i]]:
+        return L, indexes
+    # check for smaller child and swap with i
+    if values[L[left_child(i)]] < values[L[right_child(i)]]:
+        # swap values and indexes
+        (L[i], L[left_child(i)]) = (L[left_child(i)], L[i])
+        (indexes[L[i]], indexes[L[left_child(i)]]) = (indexes[L[left_child(i)]], indexes[L[i]])
+        down_heapify(L, values, indexes, left_child(i))
+        return L, indexes
+    # right child is smaller
+    (L[i], L[right_child(i)]) = (L[right_child(i)], L[i])
+    (indexes[L[i]], indexes[L[right_child(i)]]) = (indexes[L[right_child(i)]], indexes[L[i]])
+    down_heapify(L, values, indexes, right_child(i))
+    return L, indexes
+
+
+def shortest_dist_node(dist):
+    best_node = 'undefined'
+    best_value = 1000000
+    for v in dist:
+        if dist[v] < best_value:
+            (best_node, best_value) = (v, dist[v])
+    return best_node
+
+
+def dijkstra(G, v):
+    # Implementation of Dijkstra's algorithm to find shortest path to each node in graph, G, from node, v.
+    # Initialise a min heap with node v, using a dict to store its value and a dict for its index in the heap for quick
+    # access of either value, necessary during this function. Top value (min) of the heap is taken as the current node
+    # then replaced by the bottom value, and heap down heapified to reform the heap with the next shortest value now at
+    # the top of the heap. The neighbours of the current node are checked, and if they arent finished already, we can
+    # add or update their distance so far then add to the heap if necessary then up heapify from that node to maintain
+    # the heap. After all neighbours are checked, the heap now contains to shortest path so far as the top value and the
+    # loop can continue finding the next shortest path till all nodes shortest paths are found
+
+    dist_so_far_heap = [v]  # use heap with initial node key as root or top of heap as it has min distance
+    unfinished_nodes = {v: 0}
+    heap_indexes = {v: 0}
+    final_dist = {}
+    # continue till all nodes final shortest path value is determined
+    while len(final_dist) < len(G):
+
+        print()
+        print("heap", dist_so_far_heap)
+        print("distances", unfinished_nodes)
+        print("indexes", heap_indexes)
+
+        # find shortest dist neighbour (will be top of heap), and use that as the next current node
+        curr_node = dist_so_far_heap[0]
+        # set the final distance for this current node and delete from dist_so_far dict
+        final_dist[curr_node] = unfinished_nodes[curr_node]
+        print("curr node:", curr_node)
+        print("final dist:", final_dist)
+        # replace top of heap with the value at bottom of heap (removing the bottom value)
+        # then down heapify to ensure a new valid heap is formed so we can find next shortest path
+        dist_so_far_heap[0] = dist_so_far_heap[len(dist_so_far_heap)-1]
+        heap_indexes[dist_so_far_heap[0]] = 0
+        del dist_so_far_heap[len(dist_so_far_heap)-1]
+        del unfinished_nodes[curr_node]
+        del heap_indexes[curr_node]
+        dist_so_far_heap, heap_indexes = down_heapify(dist_so_far_heap, unfinished_nodes, heap_indexes, 0)
+        print("down heapify: ", dist_so_far_heap)
+        print()
+
+        # check neighbours of current node to see if the distance to them from curr node is shortest path
+        for x in G[curr_node]:
+            if x not in final_dist:  # neighbour is a child not a parent ie hasnt got a final distance yet
+                if x not in unfinished_nodes:  # havent given distance so far yet, calculate and set it
+                    unfinished_nodes[x] = final_dist[curr_node] + G[curr_node][x]
+                    # add to end of heap for sorting using up heapify
+                    print("new node: ", x)
+                    dist_so_far_heap.append(x)
+                    heap_indexes[x] = len(dist_so_far_heap) - 1
+                    dist_so_far_heap, heap_indexes = dijk_up_heapify(dist_so_far_heap, unfinished_nodes, heap_indexes,
+                                                                     len(dist_so_far_heap) - 1)
+                # has a distance already, check if this path is shorter, if so, update its value
+                elif final_dist[curr_node] + G[curr_node][x] < unfinished_nodes[x]:
+                    unfinished_nodes[x] = final_dist[curr_node] + G[curr_node][x]
+                    print("new dist", x, ":", unfinished_nodes[x])
+                    print("heap index: ", heap_indexes[x])
+                    # must try up heapify the changed value as heap may not be valid now
+                    dist_so_far_heap, heap_indexes = dijk_up_heapify(dist_so_far_heap, unfinished_nodes, heap_indexes,
+                                                                     heap_indexes[x])
+    return final_dist
+
+
+def test_dijk():
+    (a,b,c,d,e,f,g) = ('A', 'B', 'C', 'D', 'E', 'F','G')
+    # triples = ((a,c,4),(c,b,1),(a,b,6),(d,b,5),(c,d,7),(d,f,10),(d,e,7),(e,f,2))
+    triples = ((a,c,3),(c,b,10),(a,b,15),(d,b,9),(a,d,4),(d,f,7),(d,e,3),
+               (e,g,1),(e,f,5),(f,g,2),(b,f,1))
+    G = {}
+    for (i,j,k) in triples:
+        make_link_weighted(G, i, j, k)
+
+    dist = dijkstra(G, a)
+    print(dist)
+
+
 
