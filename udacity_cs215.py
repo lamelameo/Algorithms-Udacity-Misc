@@ -1,6 +1,33 @@
 """ udacity tutorials and stuff """
 
 
+# Given this function
+def make_link(G, node1, node2):
+    if node1 not in G:
+        G[node1] = {}
+    (G[node1])[node2] = 1
+    if node2 not in G:
+        G[node2] = {}
+    (G[node2])[node1] = 1
+    return G
+
+
+def create_combo_lock(nodes):
+    # nodes is a list of integers
+    G = {}
+    first_node = nodes[0]
+    prev_node = None
+    for node in nodes:
+        # exclude first node, as it has no previous node
+        if prev_node is not None:
+            # make link between each node to form chain, and add link to first node for each, to make loops
+            make_link(G, prev_node, node)
+            make_link(G, node, first_node)
+        # update prev node to current for next loop
+        prev_node = node
+    return G
+
+
 def centrality(G, v):
     distance_from_start = {}
     open_list = [v]
@@ -27,17 +54,6 @@ def mark_component(G, node, marked):
                 marked[neighbor] = True
                 total_marked += 1
     return total_marked
-
-
-# Given this function
-def make_link(G, node1, node2):
-    if node1 not in G:
-        G[node1] = {}
-    (G[node1])[node2] = 1
-    if node2 not in G:
-        G[node2] = {}
-    (G[node2])[node1] = 1
-    return G
 
 
 def create_rooted_spanning_tree(G, root):
@@ -91,7 +107,7 @@ def post_order(S, root):
     # of that node
     index = 1
     order = {}
-    # TODO: this return type, (order, ordered_list), is not allowed for the quiz...try other shitty hack,
+    # TODO: this return type, (order, ordered_list), is not allowed for the quiz...try other hack,
     # TODO: by manually counting through dict values to find right order or something else
     ordered_list = []  # used this to maintain the order of the nodes, which is lost in a dict
     unordered_stack = [root]  # stack
@@ -337,22 +353,6 @@ def test_bridge_edges():
     assert bridges == [('d', 'e')]
 
 
-def create_combo_lock(nodes):
-    # nodes is a list of integers
-    G = {}
-    first_node = nodes[0]
-    prev_node = None
-    for node in nodes:
-        # exclude first node, as it has no previous node
-        if prev_node is not None:
-            # make link between each node to form chain, and add link to first node for each, to make loops
-            make_link(G, prev_node, node)
-            make_link(G, node, first_node)
-        # update prev node to current for next loop
-        prev_node = node
-    return G
-
-
 # Write partition to return a new array with
 # all values less then `v` to the left
 # and all values greater then `v` to the right
@@ -501,15 +501,16 @@ def mode(L):
             frequencies[item] += 1
             if frequencies[item] > mode:
                 mode = frequencies[item]
-    # return mode
+    return mode
 
+    # TODO: checks all frequencies, to find the highest, slower but could list all highest or top x highest etc..
     # initialise the mode key arbitrarily to first item in list (it will be updated if it isnt the mode)
-    mode_key = L[0]
-    for value in frequencies:
-        # determine if the current highest is lower than the value we are currently checking
-        if frequencies[value] > frequencies[mode_key]:
-            mode_key = value
-    return mode_key
+    # mode_key = L[0]
+    # for value in frequencies:
+    #     # determine if the current highest is lower than the value we are currently checking
+    #     if frequencies[value] > frequencies[mode_key]:
+    #         mode_key = value
+    # return mode_key
 
 
 def up_heapify1(L):
@@ -706,12 +707,10 @@ def dijkstra(G, v):
     final_dist = {}
     # continue till all nodes final shortest path value is determined
     while len(final_dist) < len(G):
-
         print()
         print("heap", dist_so_far_heap)
         print("distances", unfinished_nodes)
         print("indexes", heap_indexes)
-
         # find shortest dist neighbour (will be top of heap), and use that as the next current node
         curr_node = dist_so_far_heap[0]
         # set the final distance for this current node and delete from dist_so_far dict
@@ -728,7 +727,6 @@ def dijkstra(G, v):
         dist_so_far_heap, heap_indexes = down_heapify(dist_so_far_heap, unfinished_nodes, heap_indexes, 0)
         print("down heapify: ", dist_so_far_heap)
         print()
-
         # check neighbours of current node to see if the distance to them from curr node is shortest path
         for x in G[curr_node]:
             if x not in final_dist:  # neighbour is a child not a parent ie hasnt got a final distance yet
@@ -978,6 +976,4 @@ def k_clique(G, k):
                 make_link(G, node, edge)
     # return a list of the nodes which still have edges
     return [node for node in G if len(G[node])]
-
-
 
