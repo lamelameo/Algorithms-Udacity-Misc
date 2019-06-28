@@ -29,6 +29,7 @@ def mark_component(G, node, marked):
     return total_marked
 
 
+# Given this function
 def make_link(G, node1, node2):
     if node1 not in G:
         G[node1] = {}
@@ -374,14 +375,7 @@ def partition(L, v):
     return P
 
 
-def rank(L, v):
-    pos = 0
-    for val in L:
-        if val < v:
-            pos += 1
-    return pos
-
-
+# given this function - I have commented on it
 import random as rand
 def top_k(L, k):
     # a recursive algorithm to find the top/bottom k values (unsorted) in a list using randomly chosen pivots
@@ -389,12 +383,15 @@ def top_k(L, k):
     # TODO: does not handle doubled values, must look to change here and partition
     (left, middle, right) = partition(L, v)
     # if lower list = k, then we have found all k values, with v being 1 above that
-    if len(left) == k: return left
+    if len(left) == k:
+        return left
     # if lower list + 1 = k then, the lower list + v constitutes all k values
-    if len(left)+1 == k: return left+[v]
+    if len(left)+1 == k:
+        return left+[v]
     # if lower list is larger than k, then we have too many values, and recursively call this function
     # still using value k to partition the lower list to make it smaller, till it reaches length k
-    if len(left) > k: return top_k(left,k)
+    if len(left) > k:
+        return top_k(left, k)
     # if lower list is smaller than k, then we have too few values, and recursively call the function
     # using a k value lowered by the length of the left list to start a new partition on the right list
     # till the length of the new lower list added to length of original lower list = k
@@ -612,6 +609,7 @@ def dijk_up_heapify(L, values, indexes, i):
         return L, indexes
 
 
+# given each of these one line functions
 def parent(i):
     return (i - 1) / 2
 
@@ -632,6 +630,7 @@ def one_child(L, i):
     return (left_child(i) < len(L)) and (right_child(i) >= len(L))
 
 
+# given this function
 def make_link_weighted(G, node1, node2, w):
     if node1 not in G:
         G[node1] = {}
@@ -654,10 +653,10 @@ def down_heapify(L, values, indexes, i):
     # the node to down heapify from. Must update the node indexes as they are changed.
 
     # if i is a leaf, it is a heap
-    if is_leaf(L,i):
+    if is_leaf(L, i):
         return L, indexes
     # if i has one child check heap property, and swap values if necessary
-    if one_child(L,i):
+    if one_child(L, i):
         if values[L[i]] > values[L[left_child(i)]]:
             # swap values
             (L[i], L[left_child(i)]) = (L[left_child(i)], L[i])
@@ -763,6 +762,222 @@ def test_dijk():
 
     dist = dijkstra(G, a)
     print(dist)
+
+
+#
+# Modify long_and_simple_path
+# to build and return the path
+#
+
+# Find me that path!
+def long_and_simple_path(G, u, v, l):
+    """
+    G: Graph
+    u: starting node
+    v: ending node
+    l: minimum length of path
+    """
+
+    from copy import deepcopy
+
+    if not long_and_simple_decision(G, u, v, l):
+        return False
+
+    # break every edge and test if the path still holds. If yes, then leave out this edge, if not, then
+    # restore the edge as it is one of the paths edges. After the algorithm finishes, the graph contains
+    # only edges in the path we want, so we can return that path by following the edges starting at node u
+
+    # used a copy of the graph, else get a runtime error - iterating over graph as we change it is apparently a problem
+    # TODO: can use list(G[node].keys()) to get a list of edges instead of iterating over the dict for that node
+    reduced_graph = deepcopy(G)
+    for node in G:
+        for edge in G[node]:
+            # break link (both ways)
+            broken = break_link(reduced_graph, node, edge)
+            # make sure break link has actually broken link, else we create duplicate links
+            if broken and not long_and_simple_decision(reduced_graph, u, v, l):
+                make_link(reduced_graph, node, edge)
+    print("reduced graph:", reduced_graph)
+    # run through the reduced graph, starting at node u, appending the next node in the path to a list
+    # until we reach node v, at which point the list contains the full path, in order
+    path = list()
+    path.append(u)
+    prev_node = u
+    node = u
+    while node != v:
+        # should be max 2 edges for each node, with u,v having only 1 edge each
+        # next node in path is the neighbour which is not the previous node
+        for neighbour in reduced_graph[node]:
+            if neighbour != prev_node:
+                path.append(neighbour)
+                prev_node = node
+                print("prev_node:", prev_node)
+                node = neighbour
+                print("node:", node)
+                break
+    return path
+
+
+# given
+def break_link(G, node1, node2):
+    # removes edge between two nodes in a graph if it exists and returns the graph
+    if node1 not in G:
+        print("error: breaking link in a non-existent node")
+        return
+    if node2 not in G:
+        print("error: breaking link in a non-existent node")
+        return
+    if node2 not in G[node1]:
+        print("error: breaking non-existent link")
+        return
+    if node1 not in G[node2]:
+        print("error: breaking non-existent link")
+        return
+    del G[node1][node2]
+    del G[node2][node1]
+    return G
+
+
+# given
+def all_perms(seq):
+    # creates a list of all permutations of the given sequence of nodes
+    if len(seq) == 0:
+        return [[]]
+    if len(seq) == 1:
+        return [seq, []]
+    most = all_perms(seq[1:])
+    first = seq[0]
+    rest = []
+    for perm in most:
+        for i in range(len(perm) + 1):
+            rest.append(perm[0:i] + [first] + perm[i:])
+    return most + rest
+
+
+# given
+def check_path(G, path):
+    # check if each node in the path is connected to the next node in the path, if any are not
+    # then it is not a valid path in the graph, as a connection is missing
+    for i in range(len(path) - 1):
+        if path[i + 1] not in G[path[i]]:
+            return False
+    return True
+
+
+# given - commented it
+def long_and_simple_decision(G, u, v, l):
+    if l == 0:
+        return False
+    # creates all possible permutations of node paths in the graph, even if they arent actual paths in the graph
+    # example: Tree rooted at 1, with children 2,3: [1,2] (valid), [1,2,3] (invalid - no edge bweteen 2 and 3)
+    perms = all_perms(list(G.keys()))
+    # check the permutations to see if there are any paths in the graph of length l (all permutations are simple paths)
+    for perm in perms:
+        # check permutation is correct length, is an actual path in the graph, starts with u, and ends with v
+        if (len(perm) >= l and check_path(G, perm) and perm[0] == u
+                and perm[len(perm) - 1] == v):
+            return True
+    return False
+
+
+def test():
+    # initialise graph
+    flights = [(1, 2), (1, 3), (2, 3), (2, 6), (2, 4), (2, 5), (3, 6), (4, 5)]
+    G = {}
+    for (x, y) in flights:
+        make_link(G, x, y)
+
+    # run simple tests
+    print("graph:", G)
+    test1 = long_and_simple_path(G, 1, 4, 9)
+    print("test1:", test1)
+    test2 = long_and_simple_path(G, 1, 4, 6)
+    print("test2:", test2)
+    assert test1 is False
+    assert test2 == [1, 3, 6, 2, 5, 4]
+
+
+# In the lecture, we described how a solution to k_clique_decision(G, k)
+# can be used to solve independent_set_decision(H,s).
+# Write a Python function that carries out this transformation.
+
+# given
+# Returns a list of all the subsets of a list of size k
+def k_subsets(lst, k):
+    if len(lst) < k:
+        return []
+    if len(lst) == k:
+        return [lst]
+    if k == 1:
+        return [[i] for i in lst]
+    return k_subsets(lst[1:], k) + map(lambda x: x + [lst[0]], k_subsets(lst[1:], k - 1))
+
+
+# given
+# Checks if the given list of nodes forms a clique in the given graph.
+def is_clique(G, nodes):
+    for pair in k_subsets(nodes, 2):
+        if pair[1] not in G[pair[0]]:
+            return False
+    return True
+
+
+# given
+# Determines if there is clique of size k or greater in the given graph.
+def k_clique_decision(G, k):
+    nodes = G.keys()
+    for i in range(k, len(nodes) + 1):
+        for subset in k_subsets(nodes, i):
+            if is_clique(G, subset):
+                return True
+    return False
+
+
+# This function should use the k_clique_decision function
+# to solve the independent set decision problem
+def independent_set_decision(H, s):
+    # intialise the inverse graph
+    G = {}
+    # if s is 1, then there is always an independent set, given the graph has at least 1 node
+    if s == 1 and len(G) > 0:
+        return True
+    # check all nodes and see if they have an edge with other nodes,
+    # if not make an edge to create the inverse graph
+    for node in H:
+        for other_nodes in H:
+            if other_nodes != node and other_nodes not in H[node]:
+                make_link(G, node, other_nodes)
+    # check if inverse graph, G, has a clique of size, s, then that set of nodes is an independant set in graph, H
+    print(H)
+    return k_clique_decision(G, s)
+
+
+# Decision problems are often just as hard as actually returning an answer.
+# Show how a k-clique can be found using a solution to the k-clique decision
+# problem.  Write a Python function that takes a graph G and a number k
+# as input, and returns a list of k nodes from G that are all connected
+# in the graph.  Your function should make use of "k_clique_decision(G, k)",
+# which takes a graph G and a number k and answers whether G contains a k-clique.
+# We will also provide the standard routines for adding and removing edges from a graph.
+def k_clique(G, k):
+    # check if there is a clique first
+    if not k_clique_decision(G, k):
+        return False
+
+    # if k is 1, then as long as graph has a node, then the graph has a clique consisting of any 1 node
+    if k == 1 and len(G):
+        return [G.keys()[0]]
+
+    # if there is then we can remove all edges, one by one, and check if a clique is still present
+    # if yes, leave removed, else, we must repair the link. After all edges are checked, only the clique remains.
+    for node in G.keys():
+        for edge in G[node].keys():
+            break_link(G, node, edge)
+            # edge is part of the clique, must re-make it
+            if not k_clique_decision(G, k):
+                make_link(G, node, edge)
+    # return a list of the nodes which still have edges
+    return [node for node in G if len(G[node])]
 
 
 
