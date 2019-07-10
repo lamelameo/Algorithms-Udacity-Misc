@@ -1,4 +1,5 @@
 """ udacity tutorials and stuff """
+import timeit
 
 
 # Eulerian Tour Ver 1
@@ -181,6 +182,8 @@ def find_eulerian_tour(graph):
 def find_eulerian_tour_recursive(graph):
     # from collections import deque
     # Images of graphs g2, g3, g4, gmega and how this algorithm finds the tour at: https://puu.sh/DPi0P/60102f6c0c.png
+    # TODO: This algorithm could be used to find Eulerian Paths too, simply by starting with an odd degree node
+    # TODO: using a doubly linked list is better than using an array, as we dont need indexes, can insert at less cost
 
     # Create a dictionary to hold keys corresponding to nodes, with values being a dict containing all the nodes it is
     # connected to. This will help in backtracking to find the right path to determine an Eulerian tour.
@@ -312,9 +315,8 @@ gmega = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (0, 7),
          (4, 13), (11, 13), (5, 11), (5, 10), (10, 12), (4, 12)]
 
 # print(find_eulerian_tour_recursive(gmega))
-print(find_eulerian_tour(gmega))
+# print(find_eulerian_tour(gmega))
 
-import timeit
 setup = "from __main__ import find_eulerian_tour_recursive"
 code = "gmega = [(0,1), (1,2), (2,3), (3,4), (4,5), (5,6), (6,7), (0,7)," \
        "(1,14), (14,16), (15,16), (1,15), (1,23), (23,19), (19,22), (1,22)," \
@@ -1302,4 +1304,152 @@ def k_clique(G, k):
                 make_link(G, node, edge)
     # return a list of the nodes which still have edges
     return [node for node in G if len(G[node])]
+
+
+#
+# Write a function, `bipartite` that
+# takes as input a graph, `G` and tries
+# to divide G into two sets where
+# there are no edges between elements of the
+# the same set - only between elements in
+# different sets.
+# If two sets exists, return one of them
+# or `None` otherwise
+# Assume G is connected
+#
+
+def bipartite2(G):
+    #
+    reference_node = list(G)[0]
+    print(reference_node)
+    set_one = [reference_node]
+    potential_set_one = []
+    set_two = []
+    print(G)
+
+    # check for nodes connected with reference, if they are, they must go in set 2, else potentially can go in set1
+    for node in G:
+        if node == reference_node:
+            pass
+        # not connected to reference node
+        if reference_node not in G[node]:
+            potential_set_one.append(node)
+        else:  # connected
+            set_two.append(node)
+    # print(potential_set_one)
+    # check nodes which arent connected to reference for links between each other, if it has one, check that node for
+    # edges with nodes in set two, if there are any, then bipartite graph is impossible, else, move to set two and
+    # continue till we have checked all of the potential set one nodes. If we complete all checks with no problem, then
+    # we will now have a valid bipartite graph
+    while potential_set_one:
+        print(potential_set_one)
+        current_node = potential_set_one.pop()
+        # check if current node connected to others in potentials
+        for comrade in potential_set_one:
+            # if it is connected
+            print("test1")
+            print(comrade)
+            if comrade in G[current_node]:
+                # check nodes in set two
+                print('test2')
+                for neighbour in set_two.copy():
+                    print("test3")
+                    print(neighbour)
+                    if current_node not in G[neighbour]:
+                        print("test4")
+                        set_two.append(current_node)
+                    else:
+                        return
+        else:
+            set_one.append(current_node)
+    return set_one
+
+
+def bipartite(G):
+    # Start at arbitrary node in graph. Append it to set1 and mark it as so, using a dict. Check edges for unmarked
+    # nodes. Any found must be in the opposite set for it to be valid. Now we must do the same for the group of nodes we
+    # placed in set 2. Check edges for nodes, following same procedure for unmarked nodes. For marked neighbours, if
+    # they are in same set as the node, that means the graph is invalid, as it was placed there to move it away from
+    # another node in opposite set and cannot move it there. Mark ths graph as invalid, but continue on to produce a
+    # graph anyway (could be trimmed of bad edges if we mark them as bad to get valid graph).
+    # This procedure starts after intialising a start node, then continues checking each new group of nodes, alternating
+    # between sets till all nodes have been placed in either set. If it is possible to create a bipartite graph,
+    # this algorithm will create a valid form, else it will mark the attempt as invalid. This is because we have checked
+    # every edge in the graph (twice) to make sure the nodes are in opposite sets, and done so in a sequential manner,
+    # meaning each nodes placement relies on the chain of nodes before it.
+
+    # Initialise start node as first node in dict keys list (doesnt matter where we start)
+    reference_node = list(G)[0]
+    sets = [[reference_node], []]
+    set_index = 1
+    slice_index = [0, 0]
+    # Add marker for each node in the graph so we know which set it has been put it, if any. 0=set1, 1=set2
+    markers = {reference_node: 0}
+    invalid_graph = False
+    break_loop = False
+    # Loop till we have placed all nodes into either set
+    while True:
+        # All nodes placed into a set, just have to check edges of the last group of nodes before we break loop,
+        # in case they are connected to other nodes in same set. If we placed at end of loop, would terminate
+        # early, as we mark before checking edges, leading to potentially returning an invalid graph.
+        if len(markers) == len(G):
+            break_loop = True
+        # alternate between set1 and set2: 1-0 = 1, 1-1 = 0
+        set_index = 1 - set_index
+        current_set = sets[set_index]
+        other_set = sets[1 - set_index]
+        # Check edges of each node in the current, and then place the connected nodes in the other set.
+        for node in current_set[slice_index[set_index]:]:  # only search new nodes added to set
+            # increment slice index for next loop for each new node found
+            slice_index[set_index] += 1
+            for neighbour in G[node]:
+                # If neighbour is marked, check if its in same group, if so, we cannot create a bipartite graph.
+                if neighbour in markers:
+                    if markers[neighbour] != 1 - set_index:
+                        # print("edge between nodes:", node, ",", neighbour, "in set",
+                        #       set_index + 1, "- graph cannot be transformed into bipartite form")
+                        invalid_graph = True
+                else:  # New node found, add to other set, marking it
+                    markers[neighbour] = 1 - set_index
+                    other_set.append(neighbour)
+
+        # All nodes are placed into either set and edges have been checked, graph is transformed into valid bipartite
+        # graph, or marked as invalid. Must now break while loop.
+        if break_loop:
+            break
+
+    if invalid_graph:
+        return None
+    else:
+        # print(sets)
+        return set(sets[0])
+
+
+def test_bipartite():
+    edges = [(1, 2), (2, 3), (1, 4), (2, 5),
+             (3, 8), (5, 6)]
+    bi_edges = [(1, 5), (2, 5), (2, 6), (7, 2), (3, 7), (3, 5), (7, 4)]
+    bad_edges = [(7, 2), (2, 5), (1, 5), (3, 4), (2, 6), (7, 4), (3, 7), (3, 5)]
+    G = {}
+    for n1, n2 in edges:
+        make_link(G, n1, n2)
+    g1 = bipartite(G)
+    assert (g1 == set([1, 3, 5]) or
+            g1 == set([2, 4, 6, 8]))
+    edges = [(1, 2), (1, 3), (2, 3)]
+    G = {}
+    for n1, n2 in edges:
+        make_link(G, n1, n2)
+    g1 = bipartite(G)
+    assert g1 == None
+
+
+setup2 = "from __main__ import bipartite\nfrom __main__ import make_link"
+code2 = "bi_edges = [(1, 5), (2, 5), (2, 6), (7, 2), (3, 7), (3, 5), (7, 4)]\n" \
+        "bad_edges = [(7, 2), (2, 5), (1, 5), (3, 4), (2, 6), (7, 4), (3, 7), (3, 5)]\n" \
+        "b1 = {}\nfor n1, n2 in bi_edges:\n    make_link(b1, n1, n2)\n" \
+        "b2 = {}\nfor n1, n2 in bad_edges:\n    make_link(b2, n1, n2)\n" \
+        "bipartite(b1); bipartite(b2)"
+time = timeit.timeit(setup=setup2, stmt=code2, number=10000)
+print(time)
 
