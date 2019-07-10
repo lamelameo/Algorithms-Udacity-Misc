@@ -1318,53 +1318,6 @@ def k_clique(G, k):
 # Assume G is connected
 #
 
-def bipartite2(G):
-    #
-    reference_node = list(G)[0]
-    print(reference_node)
-    set_one = [reference_node]
-    potential_set_one = []
-    set_two = []
-    print(G)
-
-    # check for nodes connected with reference, if they are, they must go in set 2, else potentially can go in set1
-    for node in G:
-        if node == reference_node:
-            pass
-        # not connected to reference node
-        if reference_node not in G[node]:
-            potential_set_one.append(node)
-        else:  # connected
-            set_two.append(node)
-    # print(potential_set_one)
-    # check nodes which arent connected to reference for links between each other, if it has one, check that node for
-    # edges with nodes in set two, if there are any, then bipartite graph is impossible, else, move to set two and
-    # continue till we have checked all of the potential set one nodes. If we complete all checks with no problem, then
-    # we will now have a valid bipartite graph
-    while potential_set_one:
-        print(potential_set_one)
-        current_node = potential_set_one.pop()
-        # check if current node connected to others in potentials
-        for comrade in potential_set_one:
-            # if it is connected
-            print("test1")
-            print(comrade)
-            if comrade in G[current_node]:
-                # check nodes in set two
-                print('test2')
-                for neighbour in set_two.copy():
-                    print("test3")
-                    print(neighbour)
-                    if current_node not in G[neighbour]:
-                        print("test4")
-                        set_two.append(current_node)
-                    else:
-                        return
-        else:
-            set_one.append(current_node)
-    return set_one
-
-
 def bipartite(G):
     # Start at arbitrary node in graph. Append it to set1 and mark it as so, using a dict. Check edges for unmarked
     # nodes. Any found must be in the opposite set for it to be valid. Now we must do the same for the group of nodes we
