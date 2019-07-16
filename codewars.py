@@ -127,8 +127,3 @@ def narcissistic(value):
     return narc == value
     # return value == sum(int(x) ** len(str(value)) for x in str(value))
 
-x = "tesr"
-x = x[:-1]
-print(x)
-
-print(narcissistic(1634))
