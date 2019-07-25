@@ -1560,6 +1560,7 @@ def find_best_flights(flights, origin, destination):
     # each item in the queue is a list containing, the country, flight number, and cost, time and path so far
 
     # TODO: check useage of bests in graph vs queue, are both needed?
+    # TODO: could use a min heap, with min being cost, to take least cost path first - liek Dijkstra
     queue = deque([[origin, x, 0, 0, []] for x in flights_graph[origin]])
     # run till we have exhausted the queue, move onto next starting flight
     while queue:
@@ -1614,6 +1615,8 @@ def find_best_flights(flights, origin, destination):
             else:  # flight can be connected, add to queue with relevant data and update bests for this new flight
                 flight_data[-3], flight_data[-2], flight_data[-1] = \
                     current_path, current_cost, (current_time + waiting_time)
+                # TODO: could just use best cost+time, without path, then if either are different to best when we pop
+                # off queue, we know its a different path,
                 # have to use copy of current path, as it was updating the path in the queue as we looped
                 queue.append([flight_data[0], next_flight, current_cost, (current_time+waiting_time), current_path.copy()])
 
@@ -1861,13 +1864,12 @@ flights3 = [(1,'a','b','08:00','08:30',1), (2,'b','c','09:00','10:00',5), (3,'b'
 # global variables
 #
 
-def process_graph(G):
+def process_graph1(G):
     # DFS or BFS to find all nodes connected to an arbitrary starting node. Marking each node when first seen and
     # add to a sub graph list, containing all the nodes we find in this search.
     # Repeat process starting with any remaining node until all nodes are marked and we have a list of sub graphs.
     # In our processed graph, add edges between every node in a sub graph, and we can then simply check if a node
     # is connected to another by checking the processed graph for that edge.
-    # TODO: mark any nodes with no edges, dont have to check?
     global processed_graph
     processed_graph = {}
     sub_graphs = []  # make lists for all connected, then can iterate backwards and add new edges in G (where necessary)
@@ -1902,13 +1904,41 @@ def process_graph(G):
                 processed_graph[node][curr_node] = 1
 
 
+# faster than above attempt...
+def process_graph(G):
+    # DFS or BFS to find all nodes connected to an arbitrary starting node. Unmarking each node when first seen and
+    # adding a sub graph identifier, which will be the same for all the nodes we find in this search.
+    # Repeat process starting with any remaining node until all nodes are unmarked and we have identified all nodes
+    # We can simply check if a node is connected to another by checking if they have the same sub graph identifier.
+    sub_graph = 0
+    global processed_graph
+    processed_graph = {}
+    unseen = {str(x): True for x in G}
+    # keep doing searches to find connected sub graphs until all nodes have been placed into a sub graph
+    while unseen:
+        start_node, _ = unseen.popitem()
+        stack = [start_node]
+        # keep searching till no more neighbours of nodes are found for this sub graph
+        while stack:
+            current_node = stack.pop()
+            # give all nodes in this sub graph same identifier
+            processed_graph[current_node] = sub_graph
+            for neighbour in G[current_node]:
+                if neighbour in unseen:
+                    del unseen[neighbour]
+                    stack.append(neighbour)
+        # update sub graph identifier for next loop/sub graph (if any)
+        sub_graph += 1
+
+
 #
 # When being graded, `is_connected` will be called
 # many times so this routine needs to be quick
 #
 def is_connected(i, j):
-    # check for an edge between the two nodes in the processed grpah
-    if i in processed_graph[j]:
+    # check for an edge between the two nodes in the processed graph
+    # if i in processed_graph[j]:
+    if processed_graph[i] == processed_graph[j]:
         return True
     else:
         return False
@@ -1925,8 +1955,8 @@ def test_process():
          'e': {}}
     process_graph(G)
 
-    assert is_connected('a', 'b') == True
-    assert is_connected('a', 'c') == False
+    assert is_connected('a', 'b') is True
+    assert is_connected('a', 'c') is False
 
     G = {'a': {'b': 1, 'c': 1},
          'b': {'a': 1},
@@ -1934,10 +1964,10 @@ def test_process():
          'd': {'c': 1},
          'e': {}}
     process_graph(G)
-    assert is_connected('a', 'b') == True
-    assert is_connected('a', 'c') == True
-    assert is_connected('a', 'e') == False
+    assert is_connected('a', 'b') is True
+    assert is_connected('a', 'c') is True
+    assert is_connected('a', 'e') is False
 
 
-test_process()
+# test_process()
 
