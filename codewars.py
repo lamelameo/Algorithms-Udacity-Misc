@@ -127,3 +127,249 @@ def narcissistic(value):
     return narc == value
     # return value == sum(int(x) ** len(str(value)) for x in str(value))
 
+
+# TODO: consider a heuristic algorithm using something like xy value in each quadrant, higher xy = more likely to be a
+# TODO: point on the hull
+
+# An algorithm to solve the convex hull problem in nlogn + (n-3) + 2(n-3) time in the worst case (all points are in
+# regions above our starting hull, therefore sort all points by y value in nlogn + extra work to make hull
+# Best case: 2n, if our starting hull is the convex hull, and rest of the points lie inside
+# Firstly, do a single sweep of all points and determine the maximum and minimum x and y value points and mark each.
+# Determine the initial hull with points: a = y(max), b = x(max), c = y(min), d = x(min), calc gradients: ab, bc, cd, da
+# Next, do a single sweep to sort all non marked point into 3-4 regions (if we have only 3 points from first sweep ie
+# two of the max/mins overlap, then 3 points for our starting hull). The regions are: (top right) above ab,
+# (bottom right) below bc, (bottom left) below cd, (top left) above da. Any on these lines must be considered.
+# Must consider special cases: any initial hull lines are parallel to the x or y axis, multiple initial hull points are
+# max/mins (example a rectangular hull), 3 initial hull points instead of 4 (and therefore 3 regions not 4), all points
+# lie on a single line
+
+def convex_hull(coord_list):
+    import math
+    # takes a list of coordinate lists, [[x,y],...] and outputs a sublist of coordinate lists containing points that
+    # make up the convex hull
+
+    # Sweep to determine max/min x,y points and the initial hull:  a = y(max), b = x(max), c = y(min), d = x(min)
+    # Also track left/right a,c points and top/bottom most b,d points
+    a, b, c, d = [[coord_list[0]], [coord_list[0]]], [[coord_list[0]], [coord_list[0]]], \
+                 [[coord_list[0]], [coord_list[0]]], [[coord_list[0]], [coord_list[0]]]
+
+    # TODO: remove values on a1a2,b1b2,c1c2,d1d2 lines so we dont check them in next step?
+    for coords in coord_list:
+        if coords[1] > a[0][1]:
+            a = [[coords], [coords]]
+        elif coords[1] == a[0][1]:
+            # right most a value
+            if coords[0] > a[0][0]:
+                a[0] = coords
+            # left most a value
+            elif coords[0] < a[1][0]:
+                a[1] = coords
+
+        if coords[1] < c[0][1]:
+            c = [[coords], [coords]]
+        elif coords[1] == c[0][1]:
+            # right most c value
+            if coords[0] > c[0][0]:
+                c[0] = coords
+            # left most c value
+            elif coords[0] < c[1][0]:
+                c[1] = coords
+
+        if coords[0] > b[0][0]:
+            b = [[coords], [coords]]
+        elif coords[0] == b[0][0]:
+            # top most b value
+            if coords[1] > b[0][1]:
+                b[0] = coords
+            # bottom most b value
+            elif coords[1] < b[1][1]:
+                b[1] = coords
+
+        if coords[0] < d[0][0]:
+            d = [[coords], [coords]]
+        elif coords[1] == d[0][0]:
+            # top most d value
+            if coords[1] > d[0][1]:
+                d[0] = coords
+            # bottom most d value
+            elif coords[1] < d[1][1]:
+                d[1] = coords
+
+    # check for overlapping points in a,b,c,d, if we find a region is a single point, then flag it to skip in next step
+    # for squares or vertical/vertical lines all regions will be flagged and thus skipped
+    flag_ab, flag_bc, flag_cd, flag_da = False, False, False, False
+    # unflagged = [1, 2, 3, 4]
+    if a[1] == b[0]:
+        flag_ab = True
+        # unflagged.remove(1)
+    if b[1] == c[1]:
+        flag_bc = True
+        # unflagged.remove(2)
+    if c[0] == d[1]:
+        flag_cd = True
+        # unflagged.remove(3)
+    if d[0] == a[0]:
+        flag_da = True
+        # unflagged.remove(4)
+
+    # TODO: can check if we have a square or line here by checking for all empty regions then checking some stuff...
+
+    # determine rise and runs and gradients, accounting for infinite gradients
+    ab_rise = (b[0][1] - a[1][1])
+    ab_run = (b[0][0] - a[1][0])
+    bc_rise = (c[1][1] - b[1][1])
+    bc_run = (c[1][0] - b[1][0])
+    cd_rise = (d[1][1] - c[0][1])
+    cd_run = (d[1][0] - c[0][0])
+    da_rise = (a[0][1] - d[0][1])
+    da_run = (a[0][0] - d[0][0])
+    ab, bc, cd, da = 0, 0, 0, 0
+    rises = [ab_rise, bc_rise, cd_rise, da_rise]
+    runs = [ab_run, bc_run, cd_run, da_run]
+    gradients = [ab, bc, cd, da]
+    for x in range(4):
+        try:
+            gradients[x] = rises[x]/runs[x]
+        except ZeroDivisionError:
+            gradients[x] = math.inf
+
+    # TODO: How do I remove the full check for any region if flagged without checking the flag every loop...?
+    # TODO: Without also having to write out code for every combination of flags...
+
+    # determine the points in each region
+    region1, region2, region3, region4 = [], [], [], []  # above a2b1, below b2c2, below c1d2, above d1a1
+    for coords in coord_list:  # points on lines; ab, bc, cd, da, will fail at 2nd conditions
+        if not flag_ab and a[1][0] < coords[0] < b[0][0] and ab < ((coords[1] - a[1][1])/(coords[0] - a[1][0])):
+            region1.append(coords)
+        elif not flag_bc and c[1][0] < coords[0] < b[1][0] and bc < ((coords[1] - b[1][1])/(coords[0] - b[1][0])):
+            region2.append(coords)
+        elif not flag_cd and c[0][0] > coords[0] > d[1][0] and cd < ((coords[1] - c[0][1])/(coords[0] - c[0][0])):
+            region3.append(coords)
+        elif not flag_da and a[0][0] > coords[0] > d[0][0] and da < ((coords[1] - d[0][1]) / (coords[0] - d[0][0])):
+            region4.append(coords)
+
+    # determine hulls for each region, first sort by x or y and then scan points checking gradients
+
+    # region 1: sort by descending y, gradient is decreasing
+    hull = [a[1]]
+    region1.sort(key=lambda vertex: vertex[1], reverse=True)
+    prev_grad = 0
+    counter = 0
+    for point in region1:
+        # reject point if its x value is less than the previous point, as it cannot be part of the hull
+        # this means we are also limiting the tested gradients to -ve values due to the y sorting we have done
+        if point[0] <= hull[-1][0]:  # protects from infinite gradients
+            continue
+        next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+        # if we have same gradient as previous, remove the intermediate point as per the instructions
+        if next_grad == prev_grad:
+            hull.pop()
+            hull.append(point)
+            continue
+        # must backtrack if our gradient increases, till we have consecutive decreasing gradients
+        while next_grad > prev_grad:
+            counter -= 1
+            hull.pop()
+            # if we backtrack to start of list, then we must stop trying to check previous gradients. and connect latest
+            # point to starting point
+            if counter == 0:
+                prev_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+                break
+            else:
+                prev_grad = (hull[-1][1] - hull[-2][1]) / (hull[-1][0] - hull[-2][0])
+                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+        hull.append(point)
+        counter += 1
+
+    # region 2: sort by descending x, gradient is decreasing
+    region2.sort(key=lambda vertex: vertex[0], reverse=True)
+    hull.append(b[0])
+    hull.append(b[1])
+    # initialise loop this time as we cannot use negative infinity (idk how)
+    prev_grad = (region2[0][1] - hull[-1][1]) / (region2[0][0] - hull[-1][0])
+    counter = 1
+    hull.append(region2[0])
+    for point in region2:
+        # reject higher y values
+        if point[1] >= hull[-1][1]:  # will skip the first item
+            continue
+        next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+        # if we have same gradient as previous, remove the intermediate point as per the instructions
+        if next_grad == prev_grad:
+            hull.pop()
+            hull.append(point)
+            continue
+        # must backtrack if our gradient decreases, till we have consecutive increasing gradients
+        while next_grad > prev_grad:
+            counter -= 1
+            hull.pop()
+            if counter == 0:
+                prev_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+                break
+            else:
+                prev_grad = (hull[-1][1] - hull[-2][1]) / (hull[-1][0] - hull[-2][0])
+                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+        hull.append(point)
+        counter += 1
+
+    # region 3: sort by ascending y, gradient is decreasing
+    region3.sort(key=lambda vertex: vertex[1])
+    hull.append(c[1])
+    hull.append(c[0])
+    prev_grad = 0
+    counter = 0
+    for point in region3:
+        if point[0] >= hull[-1][0]:
+            continue
+        next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+        # if we have same gradient as previous, remove the intermediate point as per the instructions
+        if next_grad == prev_grad:
+            hull.pop()
+            hull.append(point)
+            continue
+        # must backtrack if our gradient increases, till we have consecutive decreasing gradients
+        while next_grad > prev_grad:
+            counter -= 1
+            hull.pop()
+            if counter == 0:
+                prev_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+                break
+            else:
+                prev_grad = (hull[-1][1] - hull[-2][1]) / (hull[-1][0] - hull[-2][0])
+                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+        hull.append(point)
+        counter += 1
+
+    # region 4: sort by ascending x, gradient is decreasing
+    region4.sort(key=lambda vertex: vertex[0])
+    hull.append(d[1])
+    hull.append(d[0])
+    prev_grad = 0
+    counter = 0
+    for point in region4:
+        # lower y are ignored
+        if point[1] <= hull[-1][1]:
+            continue
+        next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+        # if we have same gradient as previous, remove the intermediate point as per the instructions
+        if next_grad == prev_grad:
+            hull.pop()
+            hull.append(point)
+            continue
+        # must backtrack if our gradient increases, till we have consecutive decreasing gradients
+        while next_grad > prev_grad:
+            counter -= 1
+            hull.pop()
+            if counter == 0:
+                prev_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+                break
+            else:
+                prev_grad = (hull[-1][1] - hull[-2][1]) / (hull[-1][0] - hull[-2][0])
+                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+        hull.append(point)
+        counter += 1
+    # append a1 as the last hull vertex
+    hull.append(a[0])
+
+    # returns a list of vertices on the convex hull starting from a2 and travelling clockwise around the polygon to a1
+    return hull
