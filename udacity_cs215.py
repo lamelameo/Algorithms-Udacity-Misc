@@ -149,9 +149,7 @@ def find_eulerian_tour(graph):
     # node, retaining the correct sequence of nodes. Then we can insert each node from this loop into the other,
     # after the index where that node appears in that loop.
     # TODO: some use of dict would help here... with a key for each sub loop, and a value for each node
-
     # TODO: what is the best way to insert to do least indexing?
-    # print("sub loops", sub_loops)
 
     # Nested function to insert a loop into another. Removes the last loop in the list of loops we have found and for
     # each node in that loop, it tries to find a loop in the list which also contains that node. When successful, the
@@ -160,7 +158,7 @@ def find_eulerian_tour(graph):
     # Used a function simply for ease of breaking multiple for-loops by returning once we have completed an insertion.
     def join_loops():
         current_loop = sub_loops.pop()
-        # TODO: BRUTE FORCE through each node and each other loop to find the shifting/insertion points
+        # BRUTE FORCE through each node and each other loop to find the shifting/insertion points
         for node in current_loop:  # check all nodes of loop to be inserted
             for insert_loop in sub_loops:  # check other loops
                 for insert_index, insert_node in enumerate(insert_loop):  # check for insertion point
@@ -278,13 +276,13 @@ def find_eulerian_tour_recursive(graph):
         # Once we have searched all nodes in a sub loop and found no unvisited edges, we will exit the while loop at
         # that recursion depth. Must then return the sub loop so it can be appended to the parent loop
         return sub_loop
-    # Shift tour to start at the 2nd node, only have to insert that node at the end, instead of inserting first
+    # Shift tour to start at the 2nd node, only have to append that node to the end, instead of inserting first
     # node at the start of the tour which is more expensive
     tour = find_tour(start_node)
-    shifted_tour = tour + [tour[0]]
+    tour.append(tour[0])
     # Return the node we started with + all loops combined from find_tour.
     # tour = [start_node] + tour
-    return shifted_tour
+    return tour
 
 
 # g2,g3,g4 are same graph with different edge orders to give different starting points and paths for different tests
@@ -1607,8 +1605,8 @@ def find_best_flights(flights, origin, destination):
             flight_data = flights_graph[current_country][next_flight]
             waiting_time = flight_data[2] - arrival  # time between arrival and next flight
             # make sure departure time is after current and check best cost so we only consider cheaper paths to the
-            # next flight. TODO: reject cyclical paths, ie already seen countries in this path - how to?
-            if arrival > flight_data[2] or flight_data[-2] < current_cost \
+            # next flight. TODO: reject cyclical paths, ie already seen countries in this path - howto? use next flight?
+            if arrival > flight_data[2] or flight_data[-2] < current_cost\
                     or (flight_data[-2] == current_cost and flight_data[-1] < current_time + waiting_time):
                 # print("flight rejected")
                 continue

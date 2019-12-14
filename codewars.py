@@ -144,39 +144,41 @@ def narcissistic(value):
 # lie on a single line
 
 def convex_hull(coord_list):
-    import math
     # takes a list of coordinate lists, [[x,y],...] and outputs a sublist of coordinate lists containing points that
-    # make up the convex hull
+    # make up the convex hull. Can use a practical adjustment such as max(x + y) in each region to get another point
+    # (not necessarily on the hull) to sweep and eliminate points before sorting if there are many points
 
-    # Sweep to determine max/min x,y points and the initial hull:  a = y(max), b = x(max), c = y(min), d = x(min)
-    # Also track left/right a,c points and top/bottom most b,d points
-    a, b, c, d = [[coord_list[0]], [coord_list[0]]], [[coord_list[0]], [coord_list[0]]], \
-                 [[coord_list[0]], [coord_list[0]]], [[coord_list[0]], [coord_list[0]]]
+    # Sweep to determine max/min x,y points and the initial hull:  a1,a2 = y(max left,rightmost),
+    # b1,b2 = x(max, up,downmost), c1,c2 = y(min left,rightmost), d1,d2 = x(min up,downmost)
+    a, b, c, d = [coord_list[0], coord_list[0]], [coord_list[0], coord_list[0]], \
+                 [coord_list[0], coord_list[0]], [coord_list[0], coord_list[0]]
 
     # TODO: remove values on a1a2,b1b2,c1c2,d1d2 lines so we dont check them in next step?
+
     for coords in coord_list:
+        # a points
         if coords[1] > a[0][1]:
-            a = [[coords], [coords]]
+            a = [coords, coords]
         elif coords[1] == a[0][1]:
-            # right most a value
-            if coords[0] > a[0][0]:
-                a[0] = coords
             # left most a value
-            elif coords[0] < a[1][0]:
+            if coords[0] < a[0][0]:
+                a[0] = coords
+            # right most a value
+            elif coords[0] > a[1][0]:
                 a[1] = coords
-
+        # c points
         if coords[1] < c[0][1]:
-            c = [[coords], [coords]]
+            c = [coords, coords]
         elif coords[1] == c[0][1]:
-            # right most c value
-            if coords[0] > c[0][0]:
-                c[0] = coords
             # left most c value
-            elif coords[0] < c[1][0]:
+            if coords[0] < c[0][0]:
+                c[0] = coords
+            # right most c value
+            elif coords[0] > c[1][0]:
                 c[1] = coords
-
+        # b points
         if coords[0] > b[0][0]:
-            b = [[coords], [coords]]
+            b = [coords, coords]
         elif coords[0] == b[0][0]:
             # top most b value
             if coords[1] > b[0][1]:
@@ -184,10 +186,10 @@ def convex_hull(coord_list):
             # bottom most b value
             elif coords[1] < b[1][1]:
                 b[1] = coords
-
+        # d points
         if coords[0] < d[0][0]:
-            d = [[coords], [coords]]
-        elif coords[1] == d[0][0]:
+            d = [coords, coords]
+        elif coords[0] == d[0][0]:
             # top most d value
             if coords[1] > d[0][1]:
                 d[0] = coords
@@ -195,43 +197,27 @@ def convex_hull(coord_list):
             elif coords[1] < d[1][1]:
                 d[1] = coords
 
-    # check for overlapping points in a,b,c,d, if we find a region is a single point, then flag it to skip in next step
-    # for squares or vertical/vertical lines all regions will be flagged and thus skipped
+    # Check for overlapping points: a2/b1, b2/c2, c1/d2, d1/a1. If we find a region is a single point, then flag it
+    # to skip in next step. For squares or vertical/horizontal lines all regions will be flagged and thus skipped
     flag_ab, flag_bc, flag_cd, flag_da = False, False, False, False
-    # unflagged = [1, 2, 3, 4]
     if a[1] == b[0]:
         flag_ab = True
-        # unflagged.remove(1)
     if b[1] == c[1]:
         flag_bc = True
-        # unflagged.remove(2)
     if c[0] == d[1]:
         flag_cd = True
-        # unflagged.remove(3)
     if d[0] == a[0]:
         flag_da = True
-        # unflagged.remove(4)
 
-    # TODO: can check if we have a square or line here by checking for all empty regions then checking some stuff...
-
-    # determine rise and runs and gradients, accounting for infinite gradients
-    ab_rise = (b[0][1] - a[1][1])
-    ab_run = (b[0][0] - a[1][0])
-    bc_rise = (c[1][1] - b[1][1])
-    bc_run = (c[1][0] - b[1][0])
-    cd_rise = (d[1][1] - c[0][1])
-    cd_run = (d[1][0] - c[0][0])
-    da_rise = (a[0][1] - d[0][1])
-    da_run = (a[0][0] - d[0][0])
+    # determine rise and runs and gradients
     ab, bc, cd, da = 0, 0, 0, 0
-    rises = [ab_rise, bc_rise, cd_rise, da_rise]
-    runs = [ab_run, bc_run, cd_run, da_run]
     gradients = [ab, bc, cd, da]
-    for x in range(4):
-        try:
-            gradients[x] = rises[x]/runs[x]
-        except ZeroDivisionError:
-            gradients[x] = math.inf
+    y2x2 = [0, 1, 1, 0]  # mapping order to index we need to let us use a single for loop to calc gradients
+    y1x1 = [1, 1, 0, 0]
+    for index, (pair, flag) in enumerate([((a, b), flag_ab), ((b, c), flag_bc), ((c, d), flag_cd), ((d, a), flag_da)]):
+        if not flag:
+            gradients[index] = (pair[1][y2x2[index]][1] - pair[0][y1x1[index]][1]) / \
+                               (pair[1][y2x2[index]][0] - pair[0][y1x1[index]][0])
 
     # TODO: How do I remove the full check for any region if flagged without checking the flag every loop...?
     # TODO: Without also having to write out code for every combination of flags...
@@ -248,7 +234,8 @@ def convex_hull(coord_list):
         elif not flag_da and a[0][0] > coords[0] > d[0][0] and da < ((coords[1] - d[0][1]) / (coords[0] - d[0][0])):
             region4.append(coords)
 
-    # determine hulls for each region, first sort by x or y and then scan points checking gradients
+    # determine hulls for each region, first sort by x or y and then scan points checking x or y value and
+    # gradients and accepting the point or rejecting and backtracking to last acceptable point
 
     # region 1: sort by descending y, gradient is decreasing
     hull = [a[1]]
@@ -283,12 +270,16 @@ def convex_hull(coord_list):
 
     # region 2: sort by descending x, gradient is decreasing
     region2.sort(key=lambda vertex: vertex[0], reverse=True)
-    hull.append(b[0])
-    hull.append(b[1])
+    # make sure points are not the same before adding to hull
+    if a[1] != b[0]:
+        hull.append(b[0])
+    if b[0] != b[1]:
+        hull.append(b[1])
     # initialise loop this time as we cannot use negative infinity (idk how)
-    prev_grad = (region2[0][1] - hull[-1][1]) / (region2[0][0] - hull[-1][0])
-    counter = 1
-    hull.append(region2[0])
+    if region2:
+        prev_grad = (region2[0][1] - hull[-1][1]) / (region2[0][0] - hull[-1][0])
+        counter = 1
+        hull.append(region2[0])
     for point in region2:
         # reject higher y values
         if point[1] >= hull[-1][1]:  # will skip the first item
@@ -314,8 +305,11 @@ def convex_hull(coord_list):
 
     # region 3: sort by ascending y, gradient is decreasing
     region3.sort(key=lambda vertex: vertex[1])
-    hull.append(c[1])
-    hull.append(c[0])
+    # check points
+    if b[1] != c[1]:
+        hull.append(c[1])
+    if c[0] != c[1]:
+        hull.append(c[0])
     prev_grad = 0
     counter = 0
     for point in region3:
@@ -342,8 +336,11 @@ def convex_hull(coord_list):
 
     # region 4: sort by ascending x, gradient is decreasing
     region4.sort(key=lambda vertex: vertex[0])
-    hull.append(d[1])
-    hull.append(d[0])
+    # check points - we must check that d1 and d2 are not a2 before appending
+    if c[0] != d[1] and d[0] != d[1]:  # d2 = a1 only happens if d1 = d2
+        hull.append(d[1])
+    if d[1] != d[0] and d[0] != a[0]:
+        hull.append(d[0])
     prev_grad = 0
     counter = 0
     for point in region4:
@@ -368,8 +365,9 @@ def convex_hull(coord_list):
                 next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
         hull.append(point)
         counter += 1
-    # append a1 as the last hull vertex
-    hull.append(a[0])
+    # append a1 as the last hull vertex (if necessary)
+    if a[0] != d[0] and a[0] != a[1]:
+        hull.append(a[0])
 
     # returns a list of vertices on the convex hull starting from a2 and travelling clockwise around the polygon to a1
     return hull
