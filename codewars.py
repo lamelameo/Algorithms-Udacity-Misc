@@ -131,29 +131,45 @@ def narcissistic(value):
 # TODO: consider a heuristic algorithm using something like xy value in each quadrant, higher xy = more likely to be a
 # TODO: point on the hull
 
-# An algorithm to solve the convex hull problem in nlogn + (n-3) + 2(n-3) time in the worst case (all points are in
-# regions above our starting hull, therefore sort all points by y value in nlogn + extra work to make hull
-# Best case: 2n, if our starting hull is the convex hull, and rest of the points lie inside
-# Firstly, do a single sweep of all points and determine the maximum and minimum x and y value points and mark each.
-# Determine the initial hull with points: a = y(max), b = x(max), c = y(min), d = x(min), calc gradients: ab, bc, cd, da
-# Next, do a single sweep to sort all non marked point into 3-4 regions (if we have only 3 points from first sweep ie
-# two of the max/mins overlap, then 3 points for our starting hull). The regions are: (top right) above ab,
-# (bottom right) below bc, (bottom left) below cd, (top left) above da. Any on these lines must be considered.
-# Must consider special cases: any initial hull lines are parallel to the x or y axis, multiple initial hull points are
-# max/mins (example a rectangular hull), 3 initial hull points instead of 4 (and therefore 3 regions not 4), all points
-# lie on a single line
-
 def convex_hull(coord_list):
-    # takes a list of coordinate lists, [[x,y],...] and outputs a sublist of coordinate lists containing points that
-    # make up the convex hull. Can use a practical adjustment such as max(x + y) in each region to get another point
-    # (not necessarily on the hull) to sweep and eliminate points before sorting if there are many points
-
+    import math
     # Sweep to determine max/min x,y points and the initial hull:  a1,a2 = y(max left,rightmost),
     # b1,b2 = x(max, up,downmost), c1,c2 = y(min left,rightmost), d1,d2 = x(min up,downmost)
+
+    #       r4    a1---a2    r1
+    #           x         x
+    #         x             x
+    #       d1               b1
+    #        |               |
+    #       d2               b2
+    #         x             x
+    #           x         x
+    #       r3    c1---c2    r2
+
+    # These points are on the convex hull, and give us regions to search for points in where any other points on
+    # on the hull must be. These regions, r1,r2,r3,r4, are above a2b1 and d1a1, but below b2,c2 and c1d2.
+    # We must do a sweep of the points and determine if any points are in these regions, which can be done
+    # using the gradients of these lines and lines between the point and one on these lines (a1,b2,c1,d1)
+    # If our region boundary lines are a single point, e.g. when a2 = b1, then we dont have to check it.
+    # If we have any points in our regions, we must then determine if and how they are connected to the hull.
+    # [[[ Here we could (but wont) use a practical adjustment such as max(x + y) in each region to get another point
+    # (not necessarily on the hull) to sweep and eliminate more points before sorting if there are many points. ]]]
+    # We will move clockwise around the hull/points, ie. from r1->r4. Sort points by x or y depending on the region and
+    # check the gradient of consecutive points (starting at a2, b2, c1, d1). There will be a decreasing gradient across
+    # every hull point. If the gradient increases, we remove the previous hull point then we must backtrack, checking
+    # gradients of previous 2 points vs. prev point and current, until there is a decrease, or we hit the first point.
+    # This step takes worst case 2p, if we have to add and backtrack all points, which is 2n for all points in regions.
+    # Total time is 2n -> nlogn depending on how many hull vertices and how many points in our regions there are.
+    # E.g. a sqaure takes 1 sweep (n) to find the initial hull, and determine there are no regions to check
+    # If all points are part of convex hull, then time is: (sort) nlogn + (sweep) 2n + (construct) 2n
+
+    # initialise [a1, a2], [b1, b2], [c1, c2], [d1, d2]
     a, b, c, d = [coord_list[0], coord_list[0]], [coord_list[0], coord_list[0]], \
                  [coord_list[0], coord_list[0]], [coord_list[0], coord_list[0]]
 
     # TODO: remove values on a1a2,b1b2,c1c2,d1d2 lines so we dont check them in next step?
+
+    # TODO: simplify 1st sweep and region checks to 1 block each...
 
     for coords in coord_list:
         # a points
@@ -210,14 +226,14 @@ def convex_hull(coord_list):
         flag_da = True
 
     # determine rise and runs and gradients
-    ab, bc, cd, da = 0, 0, 0, 0
-    gradients = [ab, bc, cd, da]
-    y2x2 = [0, 1, 1, 0]  # mapping order to index we need to let us use a single for loop to calc gradients
+    grads = [None, None, None, None]
+    # mapping order to index we need to let us use a single for loop to calc gradients
+    y2x2 = [0, 1, 1, 0]
     y1x1 = [1, 1, 0, 0]
     for index, (pair, flag) in enumerate([((a, b), flag_ab), ((b, c), flag_bc), ((c, d), flag_cd), ((d, a), flag_da)]):
         if not flag:
-            gradients[index] = (pair[1][y2x2[index]][1] - pair[0][y1x1[index]][1]) / \
-                               (pair[1][y2x2[index]][0] - pair[0][y1x1[index]][0])
+            grads[index] = (pair[1][y2x2[index]][1] - pair[0][y1x1[index]][1]) / \
+                           (pair[1][y2x2[index]][0] - pair[0][y1x1[index]][0])
 
     # TODO: How do I remove the full check for any region if flagged without checking the flag every loop...?
     # TODO: Without also having to write out code for every combination of flags...
@@ -225,13 +241,13 @@ def convex_hull(coord_list):
     # determine the points in each region
     region1, region2, region3, region4 = [], [], [], []  # above a2b1, below b2c2, below c1d2, above d1a1
     for coords in coord_list:  # points on lines; ab, bc, cd, da, will fail at 2nd conditions
-        if not flag_ab and a[1][0] < coords[0] < b[0][0] and ab < ((coords[1] - a[1][1])/(coords[0] - a[1][0])):
+        if not flag_ab and a[1][0] < coords[0] < b[0][0] and grads[0] < ((coords[1] - a[1][1])/(coords[0] - a[1][0])):
             region1.append(coords)
-        elif not flag_bc and c[1][0] < coords[0] < b[1][0] and bc < ((coords[1] - b[1][1])/(coords[0] - b[1][0])):
+        elif not flag_bc and c[1][0] < coords[0] < b[1][0] and grads[1] < ((coords[1] - b[1][1])/(coords[0] - b[1][0])):
             region2.append(coords)
-        elif not flag_cd and c[0][0] > coords[0] > d[1][0] and cd < ((coords[1] - c[0][1])/(coords[0] - c[0][0])):
+        elif not flag_cd and c[0][0] > coords[0] > d[1][0] and grads[2] < ((coords[1] - c[0][1])/(coords[0] - c[0][0])):
             region3.append(coords)
-        elif not flag_da and a[0][0] > coords[0] > d[0][0] and da < ((coords[1] - d[0][1]) / (coords[0] - d[0][0])):
+        elif not flag_da and a[0][0] > coords[0] > d[0][0] and grads[3] < ((coords[1] - d[0][1])/(coords[0] - d[0][0])):
             region4.append(coords)
 
     # determine hulls for each region, first sort by x or y and then scan points checking x or y value and
@@ -242,10 +258,12 @@ def convex_hull(coord_list):
     region1.sort(key=lambda vertex: vertex[1], reverse=True)
     prev_grad = 0
     counter = 0
+    if a[1] != b[0]:
+        region1.append(b[0])
     for point in region1:
         # reject point if its x value is less than the previous point, as it cannot be part of the hull
         # this means we are also limiting the tested gradients to -ve values due to the y sorting we have done
-        if point[0] <= hull[-1][0]:  # protects from infinite gradients
+        if point[0] <= hull[-1][0]:  # also protects from zero division errors and duplicate points
             continue
         next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
         # if we have same gradient as previous, remove the intermediate point as per the instructions
@@ -260,59 +278,66 @@ def convex_hull(coord_list):
             # if we backtrack to start of list, then we must stop trying to check previous gradients. and connect latest
             # point to starting point
             if counter == 0:
-                prev_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])  # this will get set as prev grad
                 break
             else:
                 prev_grad = (hull[-1][1] - hull[-2][1]) / (hull[-1][0] - hull[-2][0])
                 next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
         hull.append(point)
+        prev_grad = next_grad
         counter += 1
 
     # region 2: sort by descending x, gradient is decreasing
     region2.sort(key=lambda vertex: vertex[0], reverse=True)
     # make sure points are not the same before adding to hull
-    if a[1] != b[0]:
-        hull.append(b[0])
     if b[0] != b[1]:
         hull.append(b[1])
+    if b[1] != c[1]:
+        region2.append(c[1])
     # initialise loop this time as we cannot use negative infinity (idk how)
     if region2:
         prev_grad = (region2[0][1] - hull[-1][1]) / (region2[0][0] - hull[-1][0])
         counter = 1
         hull.append(region2[0])
     for point in region2:
-        # reject higher y values
-        if point[1] >= hull[-1][1]:  # will skip the first item
+        # reject higher or equal y values will also skip the first item which we already added
+        if point[1] >= hull[-1][1]:
             continue
-        next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+        # if zero division error, we have p1(y) > p2(y), p1(x) = p2(x), set inf gradient and let backtrack occur
+        try:
+            next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+        except ZeroDivisionError:
+            next_grad = math.inf
         # if we have same gradient as previous, remove the intermediate point as per the instructions
         if next_grad == prev_grad:
             hull.pop()
             hull.append(point)
             continue
-        # must backtrack if our gradient decreases, till we have consecutive increasing gradients
+        # must backtrack if our gradient increases, till we have consecutive decreasing gradients
         while next_grad > prev_grad:
             counter -= 1
             hull.pop()
             if counter == 0:
-                prev_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
                 break
             else:
                 prev_grad = (hull[-1][1] - hull[-2][1]) / (hull[-1][0] - hull[-2][0])
                 next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
         hull.append(point)
+        prev_grad = next_grad
         counter += 1
 
     # region 3: sort by ascending y, gradient is decreasing
     region3.sort(key=lambda vertex: vertex[1])
-    # check points
-    if b[1] != c[1]:
-        hull.append(c[1])
+    # want to add in d2, but have to possibly delete later
+    if c[0] != d[1]:
+        region3.append(d[1])
     if c[0] != c[1]:
         hull.append(c[0])
     prev_grad = 0
     counter = 0
     for point in region3:
+        # moving negative x direction, reject higher x values
         if point[0] >= hull[-1][0]:
             continue
         next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
@@ -326,28 +351,36 @@ def convex_hull(coord_list):
             counter -= 1
             hull.pop()
             if counter == 0:
-                prev_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
                 break
             else:
                 prev_grad = (hull[-1][1] - hull[-2][1]) / (hull[-1][0] - hull[-2][0])
                 next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
         hull.append(point)
+        prev_grad = next_grad
         counter += 1
 
     # region 4: sort by ascending x, gradient is decreasing
     region4.sort(key=lambda vertex: vertex[0])
-    # check points - we must check that d1 and d2 are not a2 before appending
-    if c[0] != d[1] and d[0] != d[1]:  # d2 = a1 only happens if d1 = d2
-        hull.append(d[1])
-    if d[1] != d[0] and d[0] != a[0]:
+    # must delete d2 now, as overlaps with a2 which was already placed at start
+    if d[1] == a[1]:
+        hull.pop()
+    # check there is a region then can add a1 and potentially delete later
+    elif a[0] != d[0]:
+        region4.append(a[0])
+    if d[1] != d[0] and d[0] != a[1]:
         hull.append(d[0])
-    prev_grad = 0
+    prev_grad = math.inf
     counter = 0
     for point in region4:
         # lower y are ignored
         if point[1] <= hull[-1][1]:
             continue
-        next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+        # if zero division error, we have p1(y) < p2(y), p1(x) = p2(x), set inf gradient and let backtrack occur
+        try:
+            next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+        except ZeroDivisionError:
+            next_grad = math.inf
         # if we have same gradient as previous, remove the intermediate point as per the instructions
         if next_grad == prev_grad:
             hull.pop()
@@ -358,16 +391,25 @@ def convex_hull(coord_list):
             counter -= 1
             hull.pop()
             if counter == 0:
-                prev_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
                 break
             else:
                 prev_grad = (hull[-1][1] - hull[-2][1]) / (hull[-1][0] - hull[-2][0])
                 next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
         hull.append(point)
+        prev_grad = next_grad
         counter += 1
-    # append a1 as the last hull vertex (if necessary)
-    if a[0] != d[0] and a[0] != a[1]:
-        hull.append(a[0])
 
+    # must delete a1, if we placed it in region 4, and it overlaps with a2
+    if hull[-1] == a[1]:
+        hull.pop()
+
+    print(hull)
     # returns a list of vertices on the convex hull starting from a2 and travelling clockwise around the polygon to a1
     return hull
+
+
+# initial hull with only regions 2,4 and 3 vertically stacked points in each
+convex_hull([[10,15], [10,10], [5,0], [0,0], [0,5], [5,15], [9,6], [9,5], [9,4], [2,11], [2,12], [2,13]])
+
+
