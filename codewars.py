@@ -169,49 +169,26 @@ def convex_hull(coord_list):
 
     # TODO: remove values on a1a2,b1b2,c1c2,d1d2 lines so we dont check them in next step?
 
-    # TODO: simplify 1st sweep and region checks to 1 block each...
+    # determine corner/border values; a,b,c,d
+    def sort_coords(coords_, corners, bool1, bool2, bool3, bool4):
+        # if current coord is further than current corner point in the direction we are checking then replace
+        if bool1:
+            corners[0], corners[1] = coords_, coords_
+        # if current coord is same value in that direction, check the other direction to see if we have a new corner
+        # ie an expanded border in this direction eg: a1-a2 -> a1----a2
+        elif bool2:
+            # check left/top direction (a1,b1,c1,d1)
+            if bool3:
+                corners[0] = coords_
+            # check right/bottom direction (a2,b2,c2,d2)
+            elif bool4:
+                corners[1] = coords_
 
     for coords in coord_list:
-        # a points
-        if coords[1] > a[0][1]:
-            a = [coords, coords]
-        elif coords[1] == a[0][1]:
-            # left most a value
-            if coords[0] < a[0][0]:
-                a[0] = coords
-            # right most a value
-            elif coords[0] > a[1][0]:
-                a[1] = coords
-        # c points
-        if coords[1] < c[0][1]:
-            c = [coords, coords]
-        elif coords[1] == c[0][1]:
-            # left most c value
-            if coords[0] < c[0][0]:
-                c[0] = coords
-            # right most c value
-            elif coords[0] > c[1][0]:
-                c[1] = coords
-        # b points
-        if coords[0] > b[0][0]:
-            b = [coords, coords]
-        elif coords[0] == b[0][0]:
-            # top most b value
-            if coords[1] > b[0][1]:
-                b[0] = coords
-            # bottom most b value
-            elif coords[1] < b[1][1]:
-                b[1] = coords
-        # d points
-        if coords[0] < d[0][0]:
-            d = [coords, coords]
-        elif coords[0] == d[0][0]:
-            # top most d value
-            if coords[1] > d[0][1]:
-                d[0] = coords
-            # bottom most d value
-            elif coords[1] < d[1][1]:
-                d[1] = coords
+        sort_coords(coords, a, coords[1] > a[0][1], coords[1] == a[0][1], coords[0] < a[0][0], coords[0] > a[1][0])
+        sort_coords(coords, c, coords[1] < c[0][1], coords[1] == c[0][1], coords[0] < c[0][0], coords[0] > c[1][0])
+        sort_coords(coords, b, coords[0] > b[0][0], coords[0] == b[0][0], coords[1] > b[0][1], coords[1] < b[1][1])
+        sort_coords(coords, d, coords[0] < d[0][0], coords[0] == d[0][0], coords[1] > d[0][1], coords[1] < d[1][1])
 
     # Check for overlapping points: a2/b1, b2/c2, c1/d2, d1/a1. If we find a region is a single point, then flag it
     # to skip in next step. For squares or vertical/horizontal lines all regions will be flagged and thus skipped
@@ -232,13 +209,16 @@ def convex_hull(coord_list):
     y1x1 = [1, 1, 0, 0]
     for index, (pair, flag) in enumerate([((a, b), flag_ab), ((b, c), flag_bc), ((c, d), flag_cd), ((d, a), flag_da)]):
         if not flag:
-            grads[index] = (pair[1][y2x2[index]][1] - pair[0][y1x1[index]][1]) / \
-                           (pair[1][y2x2[index]][0] - pair[0][y1x1[index]][0])
+            try:
+                grads[index] = (pair[1][y2x2[index]][1] - pair[0][y1x1[index]][1]) / \
+                               (pair[1][y2x2[index]][0] - pair[0][y1x1[index]][0])
+            except ZeroDivisionError:
+                grads[index] = math.inf
 
     # TODO: How do I remove the full check for any region if flagged without checking the flag every loop...?
     # TODO: Without also having to write out code for every combination of flags...
 
-    # determine the points in each region
+    # determine the points in each region -  isnt possible to get zero division error
     region1, region2, region3, region4 = [], [], [], []  # above a2b1, below b2c2, below c1d2, above d1a1
     for coords in coord_list:  # points on lines; ab, bc, cd, da, will fail at 2nd conditions
         if not flag_ab and a[1][0] < coords[0] < b[0][0] and grads[0] < ((coords[1] - a[1][1])/(coords[0] - a[1][0])):
@@ -252,40 +232,52 @@ def convex_hull(coord_list):
 
     # determine hulls for each region, first sort by x or y and then scan points checking x or y value and
     # gradients and accepting the point or rejecting and backtracking to last acceptable point
+    def check_region(region, region_num, prev_grad_, counter_):
+        for point in region:
+            # skip points based on x or y values since we have sorted each region
+            # and can
+            index_ = region_num % 2
+            if region_num == 0 or region_num == 3:
+                if point[index_] <= hull[-1][index_]:
+                    continue
+            else:
+                if point[index_] >= hull[-1][index_]:
+                    continue
+
+            # get gradient from previous to current point
+            try:
+                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+            # we have vertically stacked colinear points, set infinite gradient to let backtrack occur
+            except ZeroDivisionError:
+                next_grad = math.inf
+
+            # if we have same gradient as previous, remove the intermediate point as per the instructions
+            if next_grad == prev_grad_:
+                hull.pop()
+                hull.append(point)
+                continue
+            # must backtrack if our gradient increases, till we have consecutive decreasing gradients
+            while next_grad > prev_grad_:
+                counter_ -= 1
+                hull.pop()
+                # if we backtrack to start of list, then we must stop trying to check previous gradients.
+                # and connect latest point to starting point
+                if counter_ == 0:
+                    next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])  # this will get set as prev grad
+                    break
+                else:
+                    prev_grad_ = (hull[-1][1] - hull[-2][1]) / (hull[-1][0] - hull[-2][0])
+                    next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
+            hull.append(point)
+            prev_grad_ = next_grad
+            counter_ += 1
 
     # region 1: sort by descending y, gradient is decreasing
-    hull = [a[1]]
     region1.sort(key=lambda vertex: vertex[1], reverse=True)
-    prev_grad = 0
-    counter = 0
+    hull = [a[1]]
     if a[1] != b[0]:
         region1.append(b[0])
-    for point in region1:
-        # reject point if its x value is less than the previous point, as it cannot be part of the hull
-        # this means we are also limiting the tested gradients to -ve values due to the y sorting we have done
-        if point[0] <= hull[-1][0]:  # also protects from zero division errors and duplicate points
-            continue
-        next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
-        # if we have same gradient as previous, remove the intermediate point as per the instructions
-        if next_grad == prev_grad:
-            hull.pop()
-            hull.append(point)
-            continue
-        # must backtrack if our gradient increases, till we have consecutive decreasing gradients
-        while next_grad > prev_grad:
-            counter -= 1
-            hull.pop()
-            # if we backtrack to start of list, then we must stop trying to check previous gradients. and connect latest
-            # point to starting point
-            if counter == 0:
-                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])  # this will get set as prev grad
-                break
-            else:
-                prev_grad = (hull[-1][1] - hull[-2][1]) / (hull[-1][0] - hull[-2][0])
-                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
-        hull.append(point)
-        prev_grad = next_grad
-        counter += 1
+    check_region(region1, 0, 0, 0)
 
     # region 2: sort by descending x, gradient is decreasing
     region2.sort(key=lambda vertex: vertex[0], reverse=True)
@@ -295,37 +287,15 @@ def convex_hull(coord_list):
     if b[1] != c[1]:
         region2.append(c[1])
     # initialise loop this time as we cannot use negative infinity (idk how)
+    prev_grad, counter = None, 0
     if region2:
-        prev_grad = (region2[0][1] - hull[-1][1]) / (region2[0][0] - hull[-1][0])
+        try:
+            prev_grad = (region2[0][1] - hull[-1][1]) / (region2[0][0] - hull[-1][0])
+        except ZeroDivisionError:
+            prev_grad = math.inf
         counter = 1
         hull.append(region2[0])
-    for point in region2:
-        # reject higher or equal y values will also skip the first item which we already added
-        if point[1] >= hull[-1][1]:
-            continue
-        # if zero division error, we have p1(y) > p2(y), p1(x) = p2(x), set inf gradient and let backtrack occur
-        try:
-            next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
-        except ZeroDivisionError:
-            next_grad = math.inf
-        # if we have same gradient as previous, remove the intermediate point as per the instructions
-        if next_grad == prev_grad:
-            hull.pop()
-            hull.append(point)
-            continue
-        # must backtrack if our gradient increases, till we have consecutive decreasing gradients
-        while next_grad > prev_grad:
-            counter -= 1
-            hull.pop()
-            if counter == 0:
-                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
-                break
-            else:
-                prev_grad = (hull[-1][1] - hull[-2][1]) / (hull[-1][0] - hull[-2][0])
-                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
-        hull.append(point)
-        prev_grad = next_grad
-        counter += 1
+    check_region(region2, 1, prev_grad, counter)
 
     # region 3: sort by ascending y, gradient is decreasing
     region3.sort(key=lambda vertex: vertex[1])
@@ -334,31 +304,7 @@ def convex_hull(coord_list):
         region3.append(d[1])
     if c[0] != c[1]:
         hull.append(c[0])
-    prev_grad = 0
-    counter = 0
-    for point in region3:
-        # moving negative x direction, reject higher x values
-        if point[0] >= hull[-1][0]:
-            continue
-        next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
-        # if we have same gradient as previous, remove the intermediate point as per the instructions
-        if next_grad == prev_grad:
-            hull.pop()
-            hull.append(point)
-            continue
-        # must backtrack if our gradient increases, till we have consecutive decreasing gradients
-        while next_grad > prev_grad:
-            counter -= 1
-            hull.pop()
-            if counter == 0:
-                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
-                break
-            else:
-                prev_grad = (hull[-1][1] - hull[-2][1]) / (hull[-1][0] - hull[-2][0])
-                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
-        hull.append(point)
-        prev_grad = next_grad
-        counter += 1
+    check_region(region3, 2, 0, 0)
 
     # region 4: sort by ascending x, gradient is decreasing
     region4.sort(key=lambda vertex: vertex[0])
@@ -370,35 +316,7 @@ def convex_hull(coord_list):
         region4.append(a[0])
     if d[1] != d[0] and d[0] != a[1]:
         hull.append(d[0])
-    prev_grad = math.inf
-    counter = 0
-    for point in region4:
-        # lower y are ignored
-        if point[1] <= hull[-1][1]:
-            continue
-        # if zero division error, we have p1(y) < p2(y), p1(x) = p2(x), set inf gradient and let backtrack occur
-        try:
-            next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
-        except ZeroDivisionError:
-            next_grad = math.inf
-        # if we have same gradient as previous, remove the intermediate point as per the instructions
-        if next_grad == prev_grad:
-            hull.pop()
-            hull.append(point)
-            continue
-        # must backtrack if our gradient increases, till we have consecutive decreasing gradients
-        while next_grad > prev_grad:
-            counter -= 1
-            hull.pop()
-            if counter == 0:
-                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
-                break
-            else:
-                prev_grad = (hull[-1][1] - hull[-2][1]) / (hull[-1][0] - hull[-2][0])
-                next_grad = (point[1] - hull[-1][1]) / (point[0] - hull[-1][0])
-        hull.append(point)
-        prev_grad = next_grad
-        counter += 1
+    check_region(region4, 3, math.inf, 0)
 
     # must delete a1, if we placed it in region 4, and it overlaps with a2
     if hull[-1] == a[1]:
@@ -410,6 +328,6 @@ def convex_hull(coord_list):
 
 
 # initial hull with only regions 2,4 and 3 vertically stacked points in each
-convex_hull([[10,15], [10,10], [5,0], [0,0], [0,5], [5,15], [9,6], [9,5], [9,4], [2,11], [2,12], [2,13]])
+convex_hull([[10,15], [10,10], [5,0], [0,0], [0,5], [5,15], [9,5], [9,6], [9,4], [2,11], [2,12], [2,13]])
 
 
