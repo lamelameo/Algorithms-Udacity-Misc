@@ -167,8 +167,6 @@ def convex_hull(coord_list):
     a, b, c, d = [coord_list[0], coord_list[0]], [coord_list[0], coord_list[0]], \
                  [coord_list[0], coord_list[0]], [coord_list[0], coord_list[0]]
 
-    # TODO: remove values on a1a2,b1b2,c1c2,d1d2 lines so we dont check them in next step?
-
     # determine corner/border values; a,b,c,d
     def sort_coords(coords_, corners, bool1, bool2, bool3, bool4):
         # if current coord is further than current corner point in the direction we are checking then replace
@@ -218,16 +216,20 @@ def convex_hull(coord_list):
     # TODO: How do I remove the full check for any region if flagged without checking the flag every loop...?
     # TODO: Without also having to write out code for every combination of flags...
 
-    # determine the points in each region -  isnt possible to get zero division error
+    # determine the points in each region - isnt possible to get zero division error as we restrict x values
     region1, region2, region3, region4 = [], [], [], []  # above a2b1, below b2c2, below c1d2, above d1a1
-    for coords in coord_list:  # points on lines; ab, bc, cd, da, will fail at 2nd conditions
-        if not flag_ab and a[1][0] < coords[0] < b[0][0] and grads[0] < ((coords[1] - a[1][1])/(coords[0] - a[1][0])):
+    for coords in coord_list:  # points on lines; ab, bc, cd, da, will fail at 2nd or 3rd conditions
+        if not flag_ab and a[1][0] < coords[0] and b[0][1] < coords[1] \
+                and grads[0] < ((coords[1] - a[1][1])/(coords[0] - a[1][0])):
             region1.append(coords)
-        elif not flag_bc and c[1][0] < coords[0] < b[1][0] and grads[1] < ((coords[1] - b[1][1])/(coords[0] - b[1][0])):
+        elif not flag_bc and c[1][0] < coords[0] and b[1][1] > coords[1] \
+                and grads[1] < ((coords[1] - b[1][1])/(coords[0] - b[1][0])):
             region2.append(coords)
-        elif not flag_cd and c[0][0] > coords[0] > d[1][0] and grads[2] < ((coords[1] - c[0][1])/(coords[0] - c[0][0])):
+        elif not flag_cd and c[0][0] > coords[0] and d[1][1] > coords[1] \
+                and grads[2] < ((coords[1] - c[0][1])/(coords[0] - c[0][0])):
             region3.append(coords)
-        elif not flag_da and a[0][0] > coords[0] > d[0][0] and grads[3] < ((coords[1] - d[0][1])/(coords[0] - d[0][0])):
+        elif not flag_da and a[0][0] > coords[0] and d[0][1] < coords[1] \
+                and grads[3] < ((coords[1] - d[0][1])/(coords[0] - d[0][0])):
             region4.append(coords)
 
     # determine hulls for each region, first sort by x or y and then scan points checking x or y value and
@@ -328,6 +330,6 @@ def convex_hull(coord_list):
 
 
 # initial hull with only regions 2,4 and 3 vertically stacked points in each
-convex_hull([[10,15], [10,10], [5,0], [0,0], [0,5], [5,15], [9,5], [9,6], [9,4], [2,11], [2,12], [2,13]])
+convex_hull([[10,15], [10,10], [5,0], [0,0], [0,5], [5,15], [9,5], [9,6], [9,4], [9,4], [2,11], [2,12], [2,13]])
 
 
