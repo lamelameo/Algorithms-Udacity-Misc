@@ -177,16 +177,18 @@ def find_eulerian_tour(graph):
     return sub_loops.pop()
 
 
+# Recursive algorithm to find eulerian tour, first creates a dictionary form of graph for convenience then follows
+# same loop finding concept as above
 def find_eulerian_tour_recursive(graph):
-    # from collections import deque
     # Images of graphs g2, g3, g4, gmega and how this algorithm finds the tour at: https://puu.sh/DPi0P/60102f6c0c.png
     # TODO: This algorithm could be used to find Eulerian Paths too, simply by starting with an odd degree node
-    # TODO: using a doubly linked list is better than using an array, as we dont need indexes, can insert at less cost
+    # TODO: using this algorithm, starting with the node with the most edges may perform best, as it can find a
+    # first loop consisting of multiple sub loops, reducing the amount of recursion/joining sub loops needed??
+    # Possible to end up finding a smaller amount of edges than starting at another node, but its a good bet anyway?
 
     # Create a dictionary to hold keys corresponding to nodes, with values being a dict containing all the nodes it is
     # connected to. This will help in backtracking to find the right path to determine an Eulerian tour.
     graph_map = {}
-    # max_edges_node = (0, None)
     for edge in graph:
         node1, node2 = edge[0], edge[1]
         if node1 not in graph_map:
@@ -197,48 +199,20 @@ def find_eulerian_tour_recursive(graph):
             graph_map[node2] = {node1: 0}
         else:
             graph_map[node2][node1] = 0
-        # TODO: find node with most edges to use as starting point
-        # node1_edges = len(graph_map[node1])
-        # node2_edges = len(graph_map[node2])
-        # if node1_edges > max_edges_node[0]:
-        #     max_edges_node = (node1_edges, node1)
-        # if node2_edges > max_edges_node[0]:
-        #     max_edges_node = (node2_edges, node2)
 
-    # TODO: using this algorithm, starting with the node with the most edges may perform best, as it can find a
-    # first loop consisting of multiple sub loops, reducing the amount of recursion/joining sub loops needed??
-    # Possible to end up finding a smaller amount of edges than starting at another node, but its a good bet anyway?
-    # TODO: could use max heap to get max edge node at each sub loop ?
-
-    # Initialise
-    # start_node = max_edges_node[1]
+    # Initialise with first edge in dict
     start_node = graph[0][0]
 
     def find_tour(starting_node):
         current_node = starting_node
         sub_loop = []
-        # queue = deque([])
         insert_index = -1
         # Continue recursing to find loops till we have found/added all loops and thus searched all edges
         # We manually break while loops when we finish a sub loop.
         while True:
             insert_index += 1
-            # TODO: add nodes on this loop which have more than 2 edges to a queue, as ones we have to check later,
-            # rather than checking whole loop. Num edges change if we revisit it (whether this loop or sub loop)
-            # and use all its edges, so have to check edges when we pop it from queue.
-            # TODO: can split loop at each of these points where a node has extra edges, since we have to insert sub
-            # loop here anyway, less reindexing. No matter how many edges the node has, it will use all its edges in 1
-            # sub loop so we can cut it once and be sure this nodes loop will utilise all its edges before it gets back
-            # If we end up using all the node's edges, and the split was unnecessary, just join the lists - no problem
-            # TODO: could also use a max heap instead to track the node with max num edges in each sub loop, to keep
-            # removing max num of loops each recursion
-
-            # check edges till we find one that contains the current_node
+            # traverse edges, deleting as we go until we run out of edges to check
             for neighbour in graph_map[current_node]:
-                # this node may contain sub loop, add to queue, with its index in the current loop (for inserting)
-                # if len(graph_map[neighbour]) > 2:
-                #     queue.append((insert_index, neighbour))
-                #     # TODO: cut sub loop here...
                 next_node = neighbour
                 sub_loop.append(next_node)
                 del graph_map[current_node][next_node]
@@ -255,17 +229,10 @@ def find_eulerian_tour_recursive(graph):
                 # find nodes in sub loop to contain unvisited edges, using the queue we stored multi edge nodes in
                 cumulative_index = 0
                 recursive_loops = []
-                # while queue:
                 for index, node in enumerate(sub_loop):
-                    # index, node = queue.popleft()
                     if len(graph_map[node]) != 0:
                         recursive_loop = find_tour(node)
                         recursive_loops.append((index + 1, recursive_loop))  # +1 to index - insert is after given index
-                        # TODO: can insert sub loops as we find them, but have to use sub_loop.copy()
-                        # Insert sub loop into parent, track added num of nodes for inserting other sub loops
-                        # for num, node in enumerate(recursive_loop):
-                        #     sub_loop.insert(index + 1 + num + cumulative_index, node)
-                        # cumulative_index += len(recursive_loop)
                 # Insert each sub loop, found by recursion, to the current loop keeping track of the changing index
                 # Then break while loop to return this loop up to above depth.
                 for index, loop in recursive_loops:
@@ -280,8 +247,6 @@ def find_eulerian_tour_recursive(graph):
     # node at the start of the tour which is more expensive
     tour = find_tour(start_node)
     tour.append(tour[0])
-    # Return the node we started with + all loops combined from find_tour.
-    # tour = [start_node] + tour
     return tour
 
 
