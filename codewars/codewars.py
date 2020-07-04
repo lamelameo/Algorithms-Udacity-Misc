@@ -1,10 +1,136 @@
-""" Algorithms I decided to code myself """
+""" Codewars puzzles """
 
-import timeit
+
+def langtons_ant(grid, column, row, n, direction=0):
+    # 0,1,2,3 = north, east, south, west
+    # Sets give the order of direction after rotating for counter clockwise and clockwise, respectively.
+    # After the last direction is reached (a full rotation), the order resets to index 0
+    rotation_order_sets = [(2, 1, 0, 3), (0, 1, 2, 3)]
+    # Start moving the ant, run through n iterations
+    for x in range(n):
+        position_colour = grid[row][column]  # 1 is white, 0 is black
+        # Get the rotation order corresponding to the current rotation direction, and determine the ants new direction
+        rotation_order = rotation_order_sets[position_colour]
+        direction_index = rotation_order.index(direction, 0) + 1
+        # full rotation completed, must reset direction or index will be out of range
+        if direction_index > 3:
+            direction_index = 0
+        # direction after rotation
+        direction = rotation_order[direction_index]
+        # change position to opposite colour
+        grid[row][column] = 1 - position_colour
+
+        # TODO: simple method to change direction...
+        # if position_colour:  # white
+        #     direction += 1
+        #     if direction == 4:
+        #         direction = 0
+        # else:  # black
+        #     direction -= 1
+        #     if direction == -1:
+        #         direction = 3
+        
+        # TODO: alternate method to determine direction using modulo
+        # if position_colour == 1:  # white
+        #     direction = (direction + 1) % 4
+        # elif position_colour == 0:  # black
+        #     direction = 4 - (direction - 1) % 4
+        
+        # TODO: 1 liners with more math, equivalent to the above operations with modulo
+        # (1 - position_colour) leads to switching colour value: white (1) -> 0, black (0) -> 1
+        # (2 * position_colour - 1) leads to increment/decrement: white(1) -> +1, black(0) -> -1
+        # absolute value because 0 - (0-3) is negative
+        # direction = abs(4 * (1 - position_colour) - ((direction + 2 * position_colour - 1) % 4))
+        # +4 before % operation has no effect on the new direction after incr./decr. if it is 0-3 e.g. (4 + d=1) % 4 = 1
+        # but if we increment to 4 or decrement to -1  we get the correct changes: (4 + d=4) % 4 = 0, (4 + d=-1) % 4 = 3 
+        # direction = (4 + direction + 2 * position_colour - 1) % 4
+        # direction = (3 + direction + 2 * position_colour) % 4
+        
+        # Change ants position
+        if direction == 0:  # north
+            row -= 1
+        elif direction == 1:  # east
+            column += 1
+        elif direction == 2:  # south
+            row += 1
+        elif direction == 3:  # west
+            column -= 1
+
+        # Handle expanding the grid if the ant needs to move to a position outside the current grid
+        # Also, if row/col = -1, change to 0 as the inserted group is now the first in the grid
+        # TODO: why expand with black not white?
+        num_columns = len(grid[0])
+        num_rows = len(grid)
+        if row == num_rows:  # add extra row at bottom of grid
+            grid.append([0 for _ in range(num_columns)])
+        elif row == -1:  # add extra row at top of grid
+            grid.insert(0, [0 for _ in range(num_columns)])
+            row = 0
+        elif column == num_columns:  # add extra column to right side of grid
+            for row_ in grid:  # add new item to the end of every row to create new column
+                row_.append(0)
+        elif column == -1:  # add extra column to left side of grid
+            for row_ in grid:  # add new item to start of every row to create new column
+                row_.insert(0, 0)
+            column = 0
+    return grid
+
+# print(langtons_ant([[1,0], [1,1]], 0, 0, 5, 0))
+
+
+from math import log, ceil
+def population_growth(p0, percent, aug, p):
+    # Math to solve for num years (n) given: p0, d = 1 + percent/100, aug (A), p (p(n))
+    # population after n years:
+    #              p(1) = p0*d + A
+    #              p(2) = p1*d + A = (p0*d + A)*d + A = p0d^2 + Ad + A
+    #              p(3) = p2*d + A = (p0d^2 + Ad + A)*d + A = p0d^3 + Ad^2 + Ad + A
+    #              p(n) = p0d^n + SUM(k=0 -> n-1) Ad^(k)
+
+    # For percent = 0, d = 1, therefore:
+    #              p(n) = p0(1) + SUM(k=0 -> n-1) A(1)
+    #              p(n) = p0 + nA
+    #                 n = (p(n) - p0)/A
+
+    # For d != 1, sum term is a geometric series: SUM(k=0 -> n-1) Ad^(k) = A(1 - d^n)/(1 - d)
+    #              p(n) = p0d^n + A(1 - d^n)/(1 - d)
+    #              p(n) = ((p0d^n - p0d*d^n) + (A - Ad^n))/(1 - d)
+    #      p(n) - dp(n) = p0d^n - p0d*d^n + A - Ad^n
+    #  p(n) - dp(n) - A = (p0 - p0d - A)d^n
+    #               d^n = (p(n) - dp(n) - A)/(p0 - p0d - A)
+    #          log(d^n) = log((p(n) - dp(n) - A)/(p0 - p0d - A))
+    #           nlog(d) = log((p(n) - dp(n) - A)/(p0 - p0d - A))
+    #                 n = log((p(n) - dp(n) - A)/(p0 - p0d - A)) / log(d)
+
+    if percent == 0:
+        years = (p - p0) / aug
+    else:
+        d = 1 + percent / 100
+        if p == p0:
+            return 0
+        # terms inside logarithm can not be 0 or negative or gives error...
+        # sub d = 1 + percent/100: (p - d*p - aug) = (p*percent + 100*aug), (p0 - p0*d - aug) = (p0*percent + 100*aug)
+        # both log terms are always positive, must make exception for if p = p0  as term = 0 which gives error
+        years = log((p - d * p - aug) / (p0 - p0 * d - aug)) / log(d)
+        # years = (log(p*percent + 100*aug) - log(p0*percent + 100*aug)) / log(d)
+    n = ceil(years)  # round up to nearest whole year
+    return n
+
+
+# print(population_growth(1500000, 0.0, 10000, 2000000))
+
+def narcissistic(value):
+    narc = 0
+    string = str(value)
+    for digit in string:
+        narc += int(digit) ** len(string)
+    return narc == value
+    # return value == sum(int(x) ** len(str(value)) for x in str(value))
 
 
 # TODO: consider a heuristic algorithm using something like xy value in each quadrant, higher xy = more likely to be a
 # TODO: point on the hull
+
 def convex_hull(coord_list):
     import math
     # Sweep to determine max/min x,y points and the initial hull:  a1,a2 = y(max left,rightmost),
@@ -198,228 +324,12 @@ def convex_hull(coord_list):
     if hull[-1] == a[1]:
         hull.pop()
 
+    print(hull)
     # returns a list of vertices on the convex hull starting from a2 and travelling clockwise around the polygon to a1
     return hull
 
 
-# find the index where an item would be placed in a sorted array
-def binary_search(array, item):
-    first = 0
-    last = len(array) - 1
-    flag = None
-    # loop till first = last, then compare if our value should be placed before or after it
-    while first <= last:
-        mid = (last + first)//2  # take ceil of floats
-        if item < array[mid]:  # less than mid value
-            last = mid - 1
-            flag = 0
-        elif item > array[mid]:  # greater than mid value
-            first = mid + 1
-            flag = 1
-    if flag:  # insert after value
-        return last + 1
-    else:  # insert before value
-        return last
-
-
-# Find longest palindrome given a sequence of letters. We will move left to right across letters and searching for
-# that letter's duplicate, if any, searching right to left and taking the first match we find. We will then recurse on
-# the subsequence contained between these letters and also iterate over all starting letters left to right at
-# all recursion depths. We will take the max of this iteration as our return result at each depth. If we recurse on a
-# 1 or 2 length sequence, then this will be our starting result to return and move up one depth level.
-def palindrome(word):
-    # TODO: can use a data structure to hold each letter's duplicate's indexes so we dont have to search or less search
-    # may need a lot of space to store and time to create?
-    # TODO: can save palindromes themselves in dict under own key, rather than just the subsequences
-    # this may save time if we find that palindrome, but requires extra space
-    memo = dict()
-    counter = 0
-    duplicates = dict()
-    # TODO: making array to make searching easier
-    for index, character in enumerate(word):
-        if character not in duplicates:
-            duplicates[character] = [index]
-        else:
-            duplicates[character].append(index)
-
-    # recursive function to find longest palindrome in a given sequence
-    def recurse(seq):
-        nonlocal counter
-        # already stored value of this subsequence
-        counter += 1
-        if seq in memo:
-            return memo[seq]
-
-        # otherwise must find nested duplicate letters recursively to build up palindromes
-        if len(seq) > 2:
-            # if our outer letters are same, we can just recurse on inner letter and add outer to return value
-            if seq[0] == seq[-1]:
-                pal = recurse(seq[1:-1])
-                memo[seq] = seq[0] + pal + seq[0]
-                return memo[seq]
-            # otherwise we must search for duplicate letters inside the subsequence to find best inner palindrome
-            else:
-                longest = ""
-                # iterate through all letters as starting points to find longest palindrome
-                for index_start, letter in enumerate(seq):
-                    # find duplicate by iterating backward through sequence until the letter itself
-                    for index_end in range(1, len(seq) - index_start):
-                        # found duplicate and thus a palindrome
-                        if seq[0 - index_end] == letter:
-                            # recurse on subsequence
-                            if index_end == 1:
-                                pal = recurse(seq[index_start:])
-                            else:
-                                pal = recurse(seq[index_start:1 - index_end])
-                            # TODO: * had palindrome saver here
-                            break
-                    else:  # no duplicates, recurse will just return the letter and memoize if necessary
-                        pal = recurse(letter)
-
-                    # TODO: This saves another entry for the palindrome itself, rather than sequence
-                    # TODO: may save time but requires more space, is it useful?
-                    # if pal not in memo:  # store if we havent seen this yet
-                    #     print('test1:', pal)
-                    #     memo[pal] = pal
-                    # else:
-                    #     print('test2:', pal)
-                    #     pass
-
-                    # obtain max length palindrome from all letters as starting positions
-                    if len(pal) > len(longest):
-                        longest = pal
-
-                memo[seq] = longest
-                return longest
-
-        # must check for length 1 or 2 words, in case we start with these
-        elif len(seq) == 2:  # word 2 letters
-            if seq[0] == seq[1]:  # same letter
-                memo[seq] = seq
-                return seq
-            else:  # different letters, must return only one letter so just use the first
-                memo[seq] = seq[0]
-                return seq[0]
-
-        else:  # word = 1 letter (or "" ie no sequence)
-            memo[seq] = seq
-            return seq
-
-    longest_palindrome = recurse(word)
-    # print("memoized:", len(memo))
-    # print("recursions:", counter)
-    return longest_palindrome
-
-
-# print("Longest palindrome:", palindrome("aaaaaaaaaaaaaaaaaaataaaaaaaaaaaaaaaaaaaaa"), "\n")
-
-
-# more simple method to get longest palindrome subsequence
-def palindrome2(word):
-    # store results as we determine them
-    store = dict()
-    counter = 0
-
-    def recurse(seq):
-        nonlocal counter
-        counter += 1
-        # print("sub sequence:", seq)
-        # memoized already
-        if seq in store:
-            return store[seq]
-
-        # length 1 subsequence
-        if len(seq) == 1:
-            store[seq] = seq
-            return seq
-
-        # length 2 subsequence
-        elif len(seq) == 2:
-            if seq[0] == seq[1]:
-                store[seq] = seq
-                return seq
-            else:
-                store[seq] = seq[0]
-                return seq[0]
-
-        # length > 2 subsequence
-        else:
-            # outer letters are a palindrome, must recurse and then add the result
-            if seq[0] == seq[-1]:
-                inner = recurse(seq[1:-1])
-                store[seq] = seq[0] + inner + seq[0]
-                return store[seq]
-            # outer letters are different, recurse by incrementing inwards one letter on either side and take best
-            else:
-                left = recurse(seq[:-1])
-                right = recurse(seq[1:])
-                best = max(left, right, key=lambda k: len(k))
-                store[seq] = best
-                return best
-
-    # recurse on word to get palindrome
-    pal = recurse(word)
-    # print('memoized:', len(store))
-    # print('recursions:', counter)
-    return pal
-
-
-def test_palindrome():
-
-    # print("Longset palindrome:", palindrome2('aaaaaaaaaaaaaaaaaaaataaaaaaaaaaaaaaaaaaaa'))
-    # abcdefghijklmnopqrstuvwxyzyxwvutrqponmlkjihgfedcba aaaaaaaaaaaaaaaaaaataaaaaaaaaaaaaaaaaaaaa
-    # abcabccbacbcabcabcabcabacbcbacbcabcabcbaabca aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaa
-
-    words = "tt"
-    extra = "a"
-    setup1 = "from __main__ import palindrome"
-    code1 = "palindrome(\"abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz\")"
-    time = timeit.timeit(setup=setup1, stmt=code1, number=1000)
-    print(time)
-
-    # for x in range(22):
-    #     words = extra + words + extra
-    #     setup1 = "from __main__ import palindrome2"
-    #     code1 = "palindrome2(\"{0}\")".format(words)
-    #     print(code1)
-    #     time = timeit.timeit(setup=setup1, stmt=code1, number=1)
-    #     print(time)
-
-
-# return dot product of two same sized matrices
-def dot_product(m1, m2):
-    result = []
-    # iterate through all rows
-    size_row = len(m1[0])
-    for row_index, row in enumerate(m1):
-        # print("row:", row)
-        result.append([])
-        # iterate through all items in row, multiplying by corresponding column value and adding to resulting matrix
-        # item sum
-        for m1_index, row_item in enumerate(row):
-            # print('m1 item:', row_item)
-            # iterate through all items in corresponding column
-            for item_index in range(size_row):
-                # print("m2 item:", m2[row_index][item_index])
-                try:
-                    result[row_index][item_index] += row_item*m2[m1_index][item_index]
-                except IndexError:
-                    result[row_index].append(row_item*m2[m1_index][item_index])
-            # print('result:', result[row_index])
-    return result
-
-
-def test_dot_product():
-    from math import inf
-    test = [[1,2,3],[2,0,2],[1,2,1]]
-    matrix = [[0,1,3,inf,6,inf,inf],
-              [1,0,1,inf,inf,inf,inf],
-              [3,1,0,2,inf,inf,inf],
-              [inf,inf,2,0,1,2,inf],
-              [6,inf,inf,1,0,inf,3],
-              [inf,inf,inf,2,inf,0,1],
-              [inf,inf,inf,inf,3,1,0]]
-
-    print(dot_product(matrix, matrix))
+# initial hull with only regions 2,4 and 3 vertically stacked points in each
+convex_hull([[10,15], [10,10], [5,0], [0,0], [0,5], [5,15], [9,5], [9,6], [9,4], [9,4], [2,11], [2,12], [2,13]])
 
 
