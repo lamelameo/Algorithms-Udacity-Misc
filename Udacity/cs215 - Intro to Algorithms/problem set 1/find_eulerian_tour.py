@@ -83,7 +83,7 @@ def find_eulerian_tour(graph):
 # Recursive algorithm to find eulerian tour, first creates a dictionary form of graph for convenience then follows
 # same loop finding concept as above
 def find_eulerian_tour_recursive(graph):
-    # Images of graphs g2, g3, g4, gmega and how this algorithm finds the tour at: https://puu.sh/DPi0P/60102f6c0c.png
+    # Images of graphs g2, g3, g4, gmega are shown in eulerian_tour_graphs.png
     # TODO: This algorithm could be used to find Eulerian Paths too, simply by starting with an odd degree node
     # TODO: using this algorithm, starting with the node with the most edges may perform best, as it can find a
     # first loop consisting of multiple sub loops, reducing the amount of recursion/joining sub loops needed??

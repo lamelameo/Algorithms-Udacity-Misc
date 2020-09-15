@@ -198,7 +198,3 @@ def bubblesort(array):
 
 
 # bubblesort(test)
-
-import timeit
-
-
