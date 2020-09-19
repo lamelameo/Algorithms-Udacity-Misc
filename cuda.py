@@ -411,23 +411,23 @@ def chunk_scan():
     #include <stdio.h>
     __global__ void sync_scan(unsigned char *img, int *flag)
     {
-        //extern __shared__ int counter;
-        //counter = 0;
-        extern __shared__ int counter[64];
+        __shared__ int counter[64];
         int rgb[6] = {-1, 5, 152, 181, 195, 211};
-        int x = threadIdx.x + blockDim.x * blockIdx.x;
+        int thx = threadIdx.x;
+        int x = thx + blockDim.x * blockIdx.x;
         int y = blockIdx.y;
         if(x > 5753) { return; }
-        counter[int(threadIdx.x /3)] = 1;
-        int z = threadIdx.x % 3;
+        counter[int(thx /3)] = 1;
+        // threads must be synced, as counter may be assigned out of order since warp size is not multiple of 3
+        __syncthreads();
+        int z = thx % 3;
         // check pixel colour against threshold, update counter and then must sync threads
         int pixel = img[x + y*5754];
         int bgr_pass = (rgb[z*2] < pixel) && (pixel < rgb[z*2 + 1]);
-        atomicAnd(&counter[int(threadIdx.x /3)], bgr_pass);
-        //atomicAdd(&counter, bgr_pass);
+        atomicAnd(&counter[int(thx /3)], bgr_pass);
         __syncthreads();
         // first thread in block sums the threshold results for the chunk
-        if(threadIdx.x == 0) {
+        if(thx == 0) {
             int count = 0;
             #pragma unroll
             for(int i=0; i<64; i++) {
@@ -438,25 +438,44 @@ def chunk_scan():
                 flag[1] = y;
             }
         }
-        //counter = __syncthreads_and(bgr_pass);
-        //if(counter == 192) {
-        //    flag[0] = int(x/3);
-        //    flag[1] = y;
-        //}
+    }
+    """)
+
+    kernel2 = SourceModule("""
+    #include <stdio.h>
+    __global__ void sync_scan2(unsigned char *img, int *flag)
+    {
+        __shared__ int counter;
+        //counter = 0;
+        int rgb[6] = {-1, 5, 152, 181, 195, 211};
+        int thx = threadIdx.x;
+        int x = thx + blockDim.x * blockIdx.x;
+        int y = blockIdx.y;
+        if(x > 5753) { return; }
+        int z = thx % 3;
+        // check pixel colour against threshold, update counter and then must sync threads
+        int pixel = img[x + y*5754];
+        int bgr_pass = (rgb[z*2] < pixel) && (pixel < rgb[z*2 + 1]);
+        //atomicAdd(&counter, bgr_pass);
+        //__syncthreads();
+        //int counter = __syncthreads_and(bgr_pass);
+        counter = __syncthreads_count(bgr_pass);
+        if((thx == 0) && (counter == 192)) {
+            flag[0] = int(x/3);
+            flag[1] = y;
+        }
     }
     """)
 
     image = cv.imread("test images/crop2.png")
-    func = kernel1.get_function("sync_scan")
+    # func = kernel1.get_function("sync_scan")
+    func = kernel2.get_function("sync_scan2")
     # TODO: 1.7 - 2.5 ms to get thread x,y values and access pixels from global memory, rest of the work is very fast?
     timer = time.clock()
     pix = np.array([0, 0], np.uintc)
-    # rgb = np.array([-1, 5, 152, 181, 195, 211], np.int32)
-    # rgb_gpu = gpuarray.to_gpu_async(rgb)
     pix_gpu = gpuarray.to_gpu_async(pix)
     image_gpu = gpuarray.to_gpu_async(image)
-    # block of 48 = 64 x 3, 64 pixels each block
-
+    # block of 192 = 64 x 3, 64 pixels each block
     func(image_gpu, pix_gpu, block=(192, 1, 1), grid=(30, 853))
     print(time.clock() - timer)
     pix = pix_gpu.get()
