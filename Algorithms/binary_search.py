@@ -4,17 +4,12 @@
 def binary_search(array, item):
     first = 0
     last = len(array) - 1
-    flag = None
-    # loop till first = last, then compare if our value should be placed before or after it
+    # loop till first < last, then take first as our index, as in all cases this is right choice
+    # also should handle duplicates, returning index after last duplicate
     while first <= last:
-        mid = (last + first)//2  # take ceil of floats
+        mid = (last + first)//2  # take floor of floats
         if item < array[mid]:  # less than mid value
             last = mid - 1
-            flag = 0
-        elif item > array[mid]:  # greater than mid value
+        else:  # greater than or equal to mid value
             first = mid + 1
-            flag = 1
-    if flag:  # insert after value
-        return last + 1
-    else:  # insert before value
-        return last
+    return first

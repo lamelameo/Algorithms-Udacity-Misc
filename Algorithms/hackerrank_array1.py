@@ -17,7 +17,7 @@ from random import randint
 import time
 
 
-# faster method to solve problem, takes time: O(m + 2mlogm) = scan(m) + 2*sort(mlogm)
+# faster method to solve problem, takes time: O(2m + 2mlogm) = scan(2m) + 2*sort(mlogm)
 def find_max(n, queries):
     # TODO: do we have to consider cases of bad input such as start index < end index or negative values?
     # sort queries into two arrays with items (start/end index, value), for addition and subtraction, respectively

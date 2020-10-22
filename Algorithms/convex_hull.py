@@ -82,6 +82,7 @@ def convex_hull(coord_list):
                 grads[index] = (pair[1][y2x2[index]][1] - pair[0][y1x1[index]][1]) / \
                                (pair[1][y2x2[index]][0] - pair[0][y1x1[index]][0])
             except ZeroDivisionError:
+                print('ahhhhh what')
                 grads[index] = math.inf
 
     # TODO: How do I remove the full check for any region if flagged without checking the flag every loop...?

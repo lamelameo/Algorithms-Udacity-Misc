@@ -207,6 +207,7 @@ def convex_hull(coord_list):
     y1x1 = [1, 1, 0, 0]
     for index, (pair, flag) in enumerate([((a, b), flag_ab), ((b, c), flag_bc), ((c, d), flag_cd), ((d, a), flag_da)]):
         if not flag:
+            # TODO: zero division error not possible?
             try:
                 grads[index] = (pair[1][y2x2[index]][1] - pair[0][y1x1[index]][1]) / \
                                (pair[1][y2x2[index]][0] - pair[0][y1x1[index]][0])
