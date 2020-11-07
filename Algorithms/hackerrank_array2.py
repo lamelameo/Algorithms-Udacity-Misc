@@ -9,25 +9,33 @@ import random
 import itertools
 import math
 import time
+import queue
+from AVLTree import AVLTree
+from SparseTable import SparseTable
 
 
 # Simple solution, scan all pairs sequentially, building up max as we go. Theta(n^2) time
 # TODO: is there any method to reduce scan below all n^2 pairs for all inputs?
+#  can we augment this algo to be faster?
 def simple_pairs(array):
     count = 0
     length = len(array)
     loops = 0
     for i in range(length):
         a_i = array[i]
+        # print()
+        # print("a_i", a_i)
         maximum = a_i
         # print(i)
         for j in range(i + 1, length):
             # print('test')
             loops += 1
             a_j = array[j]
+            # print("a_j", a_j)
             if a_j > maximum:
                 maximum = a_j
             if maximum >= (a_i * a_j):
+                # print('+1')
                 count += 1
     print("loops: ", loops)
     return count
@@ -43,9 +51,6 @@ def simple_pairs(array):
 # TODO: max heap to find max faster? need to find max in certain range fast -> segment tree = O(1) max, O(nlogn) space
 # at some point all pairs will just go over max immediately, therefore can terminate here
 # If we have repetitions of numbers, or 1's then we devolve to theta(n^2)
-# CAN WE???
-# we can avoid this by skipping repeats and changing the first repeat to a negative of the 1st index of non repeat,
-# then anytime we hit a repeat we simply skip to that index, avoiding unnecessary work...
 
 # Overall we have nlogn + n^alpha where alpha < 2?? Idk the exact max on possible satisfiable pairs
 def pairs(array):
@@ -117,30 +122,11 @@ def pairs_table(array):
     ary_sorted = [x for x in enumerate(array)]
     ary_sorted.sort(key=lambda key: key[1])
     ary_max = ary_sorted[-1][1]
-    print("arrays: ", ary_sorted[:50])
     length = len(ary_sorted)
     count = 0
     loops = 0
-    timer2 = time.clock()
-    # sparse_table = SparseTable(array)
-    table = [[0 for _ in range(1 + int(math.log2(len(array))))] for _ in range(len(array))]
-    n = len(array)
-    # run through size 1 range maxes first so we can use 2^(j-1) maxes each remaining loop
-    for i in range(n):
-        table[i][0] = array[i]
-    # loop through ranges sized 2^j for j = 1 to floor(logn)
-    for j in range(1, 1 + int(math.log2(n))):
-        # calc max for size 2^j ranges (there are n - 2^j of them)
-        for i in range(n - (1 << j) + 1):
-            # max for this size 2^j range is max of two sized 2^(j-1) ranges calculated in previous loop
-            table[i][j] = max(table[i][j - 1], table[i + (1 << (j - 1))][j - 1])
-    print("table construction took: ", time.clock() - timer2)
-    # for item in sparse_table.table:
-    #     print(item)
-    # iterate through i values
+    sparse_table = SparseTable(array)
     for i in range(length):
-        # if i % 1000 == 0:
-        #     print('test')
         pair_i = ary_sorted[i][1]
         # iterate through remaining values to get j to form the pair
         for j in range(i + 1, length):
@@ -148,8 +134,6 @@ def pairs_table(array):
             # value of each item of current pair
             pair_j = ary_sorted[j][1]
             # index of each item of current pair
-            # pair_start = min(ary_sorted[i][0], ary_sorted[j][0])
-            # pair_end = max(ary_sorted[i][0], ary_sorted[j][0])
             if ary_sorted[i][0] < ary_sorted[j][0]:
                 pair_start, pair_end = ary_sorted[i][0], ary_sorted[j][0]
             else:
@@ -163,54 +147,14 @@ def pairs_table(array):
                 # abort scan once our 1st pair item has no 2nd pair items satisfiable, as no further pairs will
                 # be satisfiable as they are all even larger than current item
                 if j == i + 1:
-                    # print("stopping: ", pair_i, pair_j)
                     print("loops: ", loops)
                     return count
             # check if comp is in range of pair
-            else:
-                # get biggest power of 2 <= size of given range
-                j = int(math.log2(pair_end - pair_start + 1))
-                # calculate maximum based on the two table items of that size that cover the range
-                # ie the 2 items of size 2^j that start at index_start and end at index_end, respectively
-                if table[pair_start][j] > table[pair_end - (1 << j) + 1][j]:
-                    range_max = table[pair_start][j]
-                else:
-                    range_max = table[pair_end - (1 << j) + 1][j]
-                if pair_i * pair_j <= range_max:
-                    count += 1
+            elif pair_i * pair_j <= sparse_table.max(pair_start, pair_end):
+                count += 1
 
     print("loops: ", loops)
     return count
-
-
-# Sparse Table uses O(nlogn) space taking theta(nlogn) time but allows for O(1) queries for max in any range
-class SparseTable:
-    def __init__(self, array):
-        self.array = array
-        self.table = [[0 for _ in range(1 + int(math.log2(len(array))))] for _ in range(len(array))]
-        self.construct()
-
-    def construct(self):
-        n = len(self.array)
-        # run through size 1 range maxes first so we can use 2^(j-1) maxes each remaining loop
-        for i in range(n):
-            self.table[i][0] = self.array[i]
-        # loop through ranges sized 2^j for j = 1 to floor(logn)
-        for j in range(1, 1 + int(math.log2(n))):
-            # calc max for size 2^j ranges (there are n - 2^j of them)
-            for i in range(n - 2**j + 1):
-                # max for this size 2^j range is max of two sized 2^(j-1) ranges calculated in previous loop
-                self.table[i][j] = max(self.table[i][j - 1], self.table[i + 2**(j - 1)][j - 1])
-
-    def max(self, index_start, index_end):
-        # get biggest power of 2 <= size of given range
-        j = int(math.log2(index_end - index_start + 1))
-        # calculate maximum based on the two table items of that size that cover the range
-        # ie the 2 items of size 2^j that start at index_start and end at index_end, respectively
-        if self.table[index_start][j] > self.table[index_end - 2**j + 1][j]:
-            return self.table[index_start][j]
-        else:
-            return self.table[index_end - 2**j + 1][j]
 
 
 def test():
@@ -227,13 +171,52 @@ def test():
         ary.append(random.randint(1, 30000))
     # ary = [random.randint(1, 1000000000) for _ in range(10000)]
 
+    # TODO: input array which guarantees max value is in middle of each sub array at all depths
+    # ary.sort()
+    rec = [x for x in range(1, 10001)]
+    rec_ary = [0 for _ in range(10000)]
+
+    def recurse(start, end):
+        # mid = int((start + end) / 2)
+        # rec_ary[mid] = ary.pop()
+        # if mid + 1 <= end:
+        #     recurse(mid + 1, end)
+        # if start <= mid - 1:
+        #     recurse(start, mid - 1)
+
+        num = end - start
+        if num:
+            mid = start + int(math.sqrt(end - start))
+            # print(mid)
+            rec_ary[mid] = ary.pop()
+            # print(rec_ary)
+        else:
+            rec_ary[start] = rec.pop()
+            return
+        if start <= mid - 1:
+            # print("left")
+            recurse(start, mid - 1)
+        if mid + 1 <= end:
+            # print("right")
+            recurse(mid + 1, end)
+
+    # recurse(0, 9999)
     timer = time.clock()
-    print("\npairs: ", simple_pairs(ary))
-    print("scan took: ", time.clock() - timer)
+    print("\npairs:", simple_pairs(ary))
+    print("time:", time.clock() - timer)
+    timer = time.clock()
+    print("\npairs iterated:", iterated(ary))
+    print("time:", time.clock() - timer)
+    timer = time.clock()
+    print("\npairs recursive:", recursive(ary, 0, len(ary) - 1))
+    print("time:", time.clock() - timer)
     print()
+    # print("time:", count, "n * 2(logn)^2", (2 * 10 ** 5) * (math.log2(10 ** 5)) ** 2)
+    # print("left scan:", counter2, "sqrt scan:", counter1)
     timer = time.clock()
-    print("\npairs: ", pairs_table(ary))
-    print("table took: ", time.clock() - timer)
+    print("pairs table:", pairs_table(ary))
+    print("time:", time.clock() - timer)
+    quit()
 
     # TODO: testing inserting lowest i,j pairs each step in array at worst spot for running time...make sure it is worst
     ary = [2, 48, 24, 12, 6, 36, 18, 3]
@@ -245,12 +228,20 @@ def test():
     results.sort(key=lambda key: key[1])
     print(results[-1])
 
-    # table = SparseTable([7, 2, 3, 0, 5, 10, 3, 12, 18, 19])
-    # for item in table.table:
-    #     print(item)
-    # print()
-    # print(table.table[2])
-    # print(table.max(7, 7))
+
+# find the index where an item would be placed in a sorted array
+def binary_search(ary, item):
+    first = 0
+    last = len(ary) - 1
+    # loop till first < last, then take first as our index, as in all cases this is right choice
+    # also should handle duplicates, returning index after last duplicate
+    while first <= last:
+        mid = (last + first) // 2  # take floor of floats
+        if item < ary[mid]:  # less than mid value
+            last = mid - 1
+        else:  # greater than or equal to mid value
+            first = mid + 1
+    return first
 
 
 # scan all n values and use them as potential maximum values, searching either side of current value for i,j pairs that
@@ -264,20 +255,6 @@ def array_scan(array):
     # right array
     right = [x for x in array[1:]]
     right.sort()
-
-    # find the index where an item would be placed in a sorted array
-    def binary_search(ary, item):
-        first = 0
-        last = len(ary) - 1
-        # loop till first < last, then take first as our index, as in all cases this is right choice
-        # also should handle duplicates, returning index after last duplicate
-        while first <= last:
-            mid = (last + first) // 2  # take floor of floats
-            if item < array[mid]:  # less than mid value
-                last = mid - 1
-            else:  # greater than or equal to mid value
-                first = mid + 1
-        return first
 
     # add pairs with 1 and next index item, as they arent covered with algo
     count += binary_search(right, 1)
@@ -297,8 +274,7 @@ def array_scan(array):
 
 
 # TODO: do same scan on n items as potential maximums for pairs, but use AVL tree instead of sorted lists
-# build = nlogn, can do insert, delete, and search in Θ(logn) so our overall time will be Θ(nlogn)
-# ie build + scan*(4*range max + search + insert + delete)
+# build = nlogn, can do insert, delete, and search in Θ(logn) so our overall time will be Θ(nlogn)?
 def avl_scan(array):
     # can store the max for each num in L and R, then we dont have to store multiple trees, as we just search for pairs
     # for all nums below sqrt x in L,R
@@ -309,133 +285,129 @@ def avl_scan(array):
         right_max[item] = 0
     left = AVLTree([array[0]])
     right = AVLTree(array[1:])
+
     # TODO: if x is min value in L or R, will we still find pairs with 1?
     #  also if item has size > 1 then have to take this into account
 
 
-class AVLTree:
-    """ AVL tree data structure supporting O(logn) search, insert, and delete queries in O(n) space
-    Takes one optional parameter: array - a List object which will be converted to a tree
-    Each node in the tree is a list containing 7 items: (key, parent, left, right, balance, children, size)
-    Using the children attribute we can determine the rank of item in sorted list
-    The size attribute stores the number of this key that are present in the set
-     """
-    def __init__(self, array=None):
-        # TODO: use dict for pointer like functionality? This also means we have O(1) search not O(logn)??
-        #  are there losses for dict for add/del - preprocess dict with array item with empty tuples?
-        # self.tree = []
-        self.tree = dict()
-        self.root = None
-        # we have been given an array to convert to a tree
-        if array:
-            self.root = array[0]
-            self.tree[array[0]] = [array[0], None, None, None, 0, 0, 1]
-            for item in array[1:]:
-                self.insert(item)
+# O(n(logn)^2) solution (with AVL tree, O(n^2) with array?)
+count = 0
+counter1 = 0
+counter2 = 0
+def recursive(array, start, end):
+    global count, counter1, counter2
+    size_ = end - start + 1
+    # find max, determine number of pairs and recurse on sub arrays on either side of the max, then add
+    if size_ > 1:
+        pairs = 0
+        max_x = 0
+        max_ind = 0
+        # get max then split into left and right sub arrays
+        for index in range(start, end + 1):
+            count += 1
+            if array[index] > max_x:
+                max_x = array[index]
+                max_ind = index
+        # determine number of pairs using left and right sub arrays
+        count += size_ - 1
+        count += 2 * size_ * math.log2(size_ + 1)
+        left = [x for x in array[start: max_ind]]
+        right = [x for x in array[max_ind + 1: end+1]]
+        # print("l,r", left, right)
+        left.sort()
+        right.sort()
+        count += len(left) * math.log2(len(right) + 1)
+        # TODO: just use all left items to find pairs, could use sqrt max in L,R instead
+        #  is only faster in worst case if we use a tree, as we can hold duplicates in one item
+        #  even with array we have a better best case though?
+        # root = int(math.sqrt(max_x))
+        # left_end = binary_search(left, root)
+        # right_end = binary_search(right, root)
+        # counter1 += left_end * math.log2(len(right) + 1)
+        # counter1 += right_end * math.log2(len(left) + 1)
+        # counter2 += len(left) * math.log2(len(right) + 1)
+        # count += left_end * math.log2(len(right) + 1)
+        # count += right_end * math.log2(len(left) + 1)
+        # for i in range(left_end):
+        #     mult = max_x/left[i]
+        #     pairs += binary_search(right, mult)
+        # for j in range(right_end):
+        #     mult = max_x/right[j]
+        #     pairs += binary_search(left, mult)
 
-    # find the parent node to which the item should be attached, or the item's node if it already exists
-    # return a tuple, tuple[0] is the node key and tuple[1] is 1 or 0 representing item node or parent node
-    def search(self, item):
-        node = self.tree.get(item)
-        if node:
-            return node, 1
-        else:
-            current = self.tree[self.root]
-            # traverse tree
-            while True:
-                if item < current[0]:  # item less than node - go left
-                    if current[2]:
-                        current = self.tree[current[2]]
-                    else:
-                        return current, 0
-                else:  # go right
-                    if current[3]:
-                        current = self.tree[current[3]]
-                    else:
-                        return current, 0
+        # scan smaller sub array of left or right and binary search other array for pairs
+        (scan, match) = (left, right) if left <= right else (right, left)
+        for i in scan:
+            mult = max_x / i
+            pairs += binary_search(match, mult)
+        # handle pairs of the sort; (1, max) or (max, 1) and (max=1, i) or (i, max=1)
+        if max_x == 1:
+            # print('test', left, right)
+            pairs += len(right)
+            pairs += len(left)
+        else:  # if left or right is None then binary search will return 0
+            count += math.log2(len(left) + 1) + math.log2(len(right) + 1)
+            pairs += binary_search(left, 1)
+            pairs += binary_search(right, 1)
 
-    # TODO: insert x into tree and return the index rather than having to search and insert separately
-    #  what if we have same num in tree already...return highest index of that num..or have attribute for amount
-    # insert item to tree
-    def insert(self, item):
-        node, found = self.search(item)
-        # item already in tree, increment size, update #children attribute for O(logn) parents
-        if found:
-            node[6] += 1
-            self.update_parents(self.tree[node[1]])
-        else:  # have to add item as a child of given parent node
-            self.tree[item] = [item, node[0], None, None, 0, 0, 1]
-            if item < node[0]:
-                # update parent's left child pointer and balance
-                node[2] = item
-                node[4] -= 1
-            else:
-                # update parent's right child pointer and balance
-                node[3] = item
-                node[4] += 1
-            # check if we need to balance the tree
-            self.update_parents(node)
-        return
+        # recurse on left and right sub arrays if they exist
+        if left:
+            pairs += recursive(array, start, max_ind-1)
+        if right:
+            pairs += recursive(array, max_ind+1, end)
+        # print("max:", max_x, "pairs:", pairs)
+        return pairs
 
-    # Given a parent node, B, perform rotations for parent nodes until tree is balanced, or handle updating all
-    # parent node's children attributes until the root of the tree in the case of a
-    def update_parents(self, node):
-        # TODO: handle update children no rotate calls
-        # move up O(logn) parents towards root, rotating any unbalanced nodes till we achieve balance
-        left_child = self.tree.get(node[2])
-        right_child = self.tree.get(node[3])
-        while node:
-            parent = self.tree.get(node[1])
-            # left unbalanced
-            if node[4] < -1:
-                # TODO: update balance attributes
-                # update parent to parent links to be parent to child
-                left_child[1] = node[1]
-                # change parent's attributes
-                if child[1]:
-                    # parent is a left child
-                    if parent[2] == node[0]:
-                        parent[2] = child[0]
-                    elif parent[3] == node[0]:
-                        parent[3] = child[0]
-                else:
-                    self.root = child[0]
-                    # TODO: must update childs childs pointers and parents right child pointer
-                    # and handle if there are none
-                # change child's right child to be parent's left child
-                node[2] = child[3]
-                self.tree[child[3]][1] = node[0]
-                # update child's right attributes
-                child[3] = node[0]
+    # sub array of size 1 or 0 has no further pairs
+    else:
+        count += 1
+        return 0
 
-            # right unbalanced
-            elif node[4] > 1:
-                self.left_rotate()
-            # balanced, just updating children attribute
-            else:
 
-                pass
-            # update # children up to root
-            node[5] += 1
-            # get next parent
-            # TODO: maybe bug with passing node to function and then trying to change it?
-            child = node
-            node = parent
-            # update child and parent balance attributes
-
-            # child[4] = (self.tree[child[] + child[])
-
-    #
-    def left_rotate(self):
-        return
-
-    #
-    def right_rotate(self):
-        return
-
-    #
-    def remove(self, item):
-        return
+def iterated(array):
+    pairs = 0
+    iterations = queue.Queue()
+    iterations.put((0, len(array) - 1))
+    # we will need to loop over all items only once in order dictated by recursive algo
+    while iterations.qsize():
+        start, end = iterations.get_nowait()
+        max_x = 0
+        max_ind = 0
+        # find the max of the sub array then split into left and right sections
+        for index, item in enumerate(array[start:end+1]):
+            if item > max_x:
+                max_x = item
+                max_ind = start + index
+        left = array[start:max_ind]
+        right = array[max_ind+1:end+1]
+        left.sort()
+        right.sort()
+        # calculate num of pairs, scanning smaller sub array of left or right
+        (scan, match) = (left, right) if left <= right else (right, left)
+        for i in scan:
+            mult = max_x / i
+            pairs += binary_search(match, mult)
+        # handle pairs of the sort; (1, max) or (max, 1) and (max=1, i) or (i, max=1)
+        if max_x == 1:
+            pairs += len(right)
+            pairs += len(left)
+        else:  # if left or right is None then binary search will return 0
+            pairs += binary_search(left, 1)
+            pairs += binary_search(right, 1)
+        # add left and right sub arrays to recursion queue if they exist
+        if left:
+            iterations.put((start, max_ind - 1))
+        if right:
+            iterations.put((max_ind + 1, end))
+    return pairs
 
 
 test()
+# print("simple:", simple_pairs([5,1,1,10,1,5,1,3]))
+# print("recursive:", recursive([5,1,1,10,1,5,1,3], 0, 7))
+# TODO: recursion depth limit
+# print('simple', simple_pairs([x for x in range(990, 0, -1)]))
+# print('test', recursive([x for x in range(990, 0, -1)], 0, 989))
+# print('test', recursive([random.randint(1, 1000000000) for _ in range(100000)], 0, 99999))
+print("time:", count, "n * 2(logn)^2", (2 * 10**5) * (math.log2(10**5))**2)
+print("left scan:", counter2, "sqrt scan:", counter1)
