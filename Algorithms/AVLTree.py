@@ -20,16 +20,28 @@ class AVLTree:
     def __init__(self, array=None):
         # TODO: use dict for pointer like functionality? This also means we have O(1) search not O(logn)??
         #  are there losses for dict for add/del - preprocess dict with array item with empty tuples?
+        #  Can change dict syntax to something nicer?
         # self.tree = []
         self.tree = dict()
         self.root = None
-        self.size = None
+        self.size = 0
         # we have been given an array to convert to a tree
         if array:
             self.root = array[0]
             self.tree[array[0]] = [array[0], None, None, None, 0, 0, 1]
             for item in array[1:]:
                 self.insert(item)
+
+    # return a string representation of the tree, successive line representing successive heights
+    def __str__(self):
+        tree = ""
+        queue = [self.root]
+        while queue:
+            tree += str(queue.pop())
+            while True:
+                pass
+
+        return tree
 
     # find the parent node to which the item should be attached, or the item's node if it already exists
     # return a tuple, tuple[0] is the node key and tuple[1] is 1 or 0 representing item node or parent node
@@ -38,7 +50,10 @@ class AVLTree:
         if node:
             return node, 1
         else:
-            current = self.tree[self.root]
+            current = self.tree.get(self.root)
+            # tree is empty
+            if not current:
+                return None, 0
             # traverse tree
             while True:
                 if item < current[0]:  # item less than node - go left
@@ -58,10 +73,15 @@ class AVLTree:
     def insert(self, item):
         self.size += 1
         node, found = self.search(item)
+        # inserting into empty tree
+        if not node:
+            self.root = item
+            self.tree[item] = [item, node[0], None, None, 0, 0, 1]
+            return
         # item already in tree, increment size, update #children attribute for O(logn) parents
         if found:
             node[6] += 1
-            self.rebalance(self.tree[node[1]])
+            self.rebalance(self.tree.get(node[1]))
         else:  # have to add item as a child of given parent node
             self.tree[item] = [item, node[0], None, None, 0, 0, 1]
             if item < node[0]:
@@ -72,7 +92,6 @@ class AVLTree:
                 node[3] = item
             # check if we need to balance the tree
             self.rebalance(node)
-        return
 
     # convenient function to call to deal with height of a node taking into account node=None
     def height(self, node):
@@ -134,7 +153,10 @@ class AVLTree:
                 parent[2] = b[0]
             else:
                 parent[3] = b[0]
-        b[1] = parent[0]
+            b[1] = parent[0]
+        else:
+            b[1] = None
+            self.root = b[0]
         # switch beta to be child of A and then switch A to be left child of B
         if beta:
             a[3] = beta[0]
@@ -161,7 +183,10 @@ class AVLTree:
                 parent[2] = a[0]
             else:
                 parent[3] = a[0]
-        a[1] = parent[0]
+            a[1] = parent[0]
+        else:
+            a[1] = None
+            self.root = a[0]
         # switch beta to be child of B and then switch B to be right child of A
         if beta:
             b[2] = beta[0]
@@ -183,48 +208,96 @@ class AVLTree:
     #   - 1 child; use this child as the node's replacement before deleting
     #   - 0 children; delete the node
     def remove(self, item):
-        node = self.tree[item]
+        # TODO: simplify code, probably can amalgamate lots of the branches
+        node = self.tree.get(item)
+        if not node:
+            print("Item not found.")
+            return
         self.size -= 1
+
+        # handle updating links between parent and replacement for deleted node
+        def modify_parent(self_, child):
+            # update deleted nodes parent link
+            if parent:
+                # node is a left child
+                if parent[2] == node[0]:
+                    parent[2] = child[0]
+                else:
+                    parent[3] = child[0]
+                # update left parent link
+                child[1] = parent[0]
+            else:  # deleted node was the root
+                self_.root = child[0]
+                child[1] = None
+
         # if duplicates only have to change item size attribute and update parent children attribute
         if node[6] > 1:
             node[6] -= 1
         else:
-            # TODO: handle node with 0,1,2 children
+            # handle node with 0,1,2 children
             parent = self.tree.get(node[1])
             # node has left child
             if node[2]:
+                left = self.tree[node[2]]
                 # 2 children - get successor and replace
                 if node[3]:
                     succ = self.successor(node)
-                    # have a parent, update its child
-                    if parent:
-                        # node is a left child
-                        if parent[2] == node[0]:
-                            parent[2] = succ[0]
-                        else:
-                            parent[3] = succ[0]
-                    else:
-                        self.root = succ[0]
+                    print("succ", succ)
                     succ_par = self.tree.get(succ[1])
                     succ_child = self.tree.get(succ[3])
-
+                    # successor has a right child
+                    if succ_child:
+                        # replace successor with its child - 2 cases
+                        # successor is deleted nodes right child
+                        if succ_par == node:
+                            succ_par[3] = succ_child[0]
+                            succ_child[1] = succ_par[0]
+                        # successor is a left child of some node in the right sub tree of deleted node
+                        else:
+                            succ_par[2] = succ_child[0]
+                            succ_child[1] = succ_par[0]
+                        # replace node to be deleted with successor
+                        succ[3] = node[3]
+                        self.tree[node[3]][1] = succ[0]
+                        succ[2] = left[0]
+                        left[1] = succ[0]
+                        # update deleted nodes parent link
+                        modify_parent(self, succ)
+                    # successor has no child
+                    else:
+                        # update deleted nodes parent link
+                        modify_parent(self, succ)
+                        # update left child link
+                        succ[2] = left[0]
+                        left[1] = succ[0]
+                        # if successor was right child of deleted node, we are done, otherwise must update right child
+                        # and parent of the successor
+                        if succ_par != node:
+                            succ[3] = node[3]
+                            self.tree[node[3]][1] = succ[0]
+                            succ_par[2] = None
+                    node = succ
                 # one (left) child
                 else:
-                    if parent:
-
-                        pass
+                    # update deleted nodes parent link
+                    modify_parent(self, left)
+                    node = left
             else:
                 # only one (right) child
                 if node[3]:
-                    pass
-                # 0 children, no extra actions needed
+                    right = self.tree[node[3]]
+                    # update deleted nodes parent link
+                    modify_parent(self, right)
+                    node = right
+                # 0 children
                 else:
-                    pass
-
-        # delete item from dict and rebalance the tree
-        self.tree.__delitem__(item)
+                    # update deleted nodes parent link
+                    modify_parent(self, [None, None])
+                    node = None
+            # delete item from dict
+            self.tree.__delitem__(item)
+        # rebalance the tree
         self.rebalance(node)
-        return
 
     # return the index the given item would be placed in a sorted array of the items in the tree
     def rank(self, item):
@@ -254,22 +327,47 @@ class AVLTree:
 
         return count
 
+    # TODO: what if we return None, ie no successor?
     # get the next highest item in sorted list
     def successor(self, node):
         # if we have a right subtree, find minimum in that tree
         right = self.tree.get(node[3])
         current = node
         if right:
-            left = self.tree.get(node[2])
+            # succ = self.search(node[0] + 1)  # shortcut
+            left = self.tree.get(right[2])
             while left:
                 current = left
                 left = self.tree.get(current[2])
             return current
-        # if no right subtree, must move up to parents until root or until a parent is less than current node
-        # to get the next highest node
-        parent = self.tree.get(node[1])
-        while parent and parent[3] == current[0]:
-            current = parent
+        else:
+            # if no right subtree, must move up to parents until root or until a parent is greater than current node
+            # to get the next highest node
+            # TODO: check this
             parent = self.tree.get(node[1])
-        return parent
+            if not parent:
+                return None
+            while parent[3] == current[0]:
+                current = parent
+                parent = self.tree.get(current[1])
+                # node was largest in the tree
+                if not parent:
+                    break
+            return parent
 
+
+def test():
+    # TODO: need to check different conditions for rotations, successor, rank, insert, remove
+    array = [1, 2, 3, 4, 3, 3, 5, 6, 7, 1, 2, 4]
+    tree = AVLTree(array)
+    print(tree.tree)
+    print(tree.rank(4))
+    tree.remove(4)
+    tree.remove(3)
+    print(tree.tree)
+    tree.remove(4)
+    print(tree.root)
+    print(tree.tree)
+
+
+test()
