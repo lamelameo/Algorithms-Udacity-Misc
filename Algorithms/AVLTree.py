@@ -39,7 +39,7 @@ class AVLTree:
         while queue:
             tree += str(queue.pop())
             while True:
-                pass
+                break
 
         return tree
 
@@ -67,8 +67,6 @@ class AVLTree:
                     else:
                         return current, 0
 
-    # TODO: insert x into tree and return the index rather than having to search and insert separately
-    #  what if we have same num in tree already...return highest index of that num..or have attribute for amount
     # insert item to tree
     def insert(self, item):
         self.size += 1
@@ -76,7 +74,7 @@ class AVLTree:
         # inserting into empty tree
         if not node:
             self.root = item
-            self.tree[item] = [item, node[0], None, None, 0, 0, 1]
+            self.tree[item] = [item, None, None, None, 0, 0, 1]
             return
         # item already in tree, increment size, update #children attribute for O(logn) parents
         if found:
@@ -105,14 +103,12 @@ class AVLTree:
         left = self.tree.get(node[2])
         right = self.tree.get(node[3])
         node[5] = 0
-        if not right:
-            right = 0
-        else:
+        # update children attribute
+        if right:
             node[5] += right[6] + right[5]
-        if not left:
-            left = 0
-        else:
+        if left:
             node[5] += left[6] + left[5]
+        # update height attribute
         node[4] = 1 + max(self.height(left), self.height(right))
 
     # TODO: need to deal with changes to root node in rebalance, l/r rotate, delete
@@ -120,21 +116,26 @@ class AVLTree:
     # (key, parent, left, right, height, children, size)
     def rebalance(self, node):
         while node:
+            # update height first
             self.update_height(node)
             #
             left = self.tree.get(node[2])
             right = self.tree.get(node[3])
             # left unbalanced
             if self.height(left) >= 2 + self.height(right):
+                # left.left >= left.right
                 if self.height(self.tree.get(left[2])) >= self.height(self.tree.get(left[3])):
                     self.right_rotate(node)
+                # left.left < left.right, must rotate left child first before node
                 else:
                     self.left_rotate(left)
                     self.right_rotate(node)
             # right unbalanced
             elif self.height(right) >= 2 + self.height(left):
+                # right.right >= right.left
                 if self.height(self.tree.get(right[3])) >= self.height(self.tree.get(right[2])):
                     self.left_rotate(node)
+                # right.right < right.left
                 else:
                     self.right_rotate(right)
                     self.left_rotate(node)
@@ -143,9 +144,7 @@ class AVLTree:
     #
     def left_rotate(self, a):
         b = self.tree.get(a[3])
-        alpha = self.tree.get(a[2])
         beta = self.tree.get(b[2])
-        gamma = self.tree.get(b[3])
         parent = self.tree.get(a[1])
         # if A has a parent, change its left/right child from A to B and update parent of B
         if parent:
@@ -163,19 +162,17 @@ class AVLTree:
             beta[1] = a[0]
         else:
             a[3] = None
-
+        # update A to B links
         a[1] = b[0]
         b[2] = a[0]
-        # update heights of A then B
+        # update heights of A then B (A is child)
         self.update_height(a)
         self.update_height(b)
 
     #
     def right_rotate(self, b):
         a = self.tree.get(b[2])
-        alpha = self.tree.get(a[2])
         beta = self.tree.get(a[3])
-        gamma = self.tree.get(b[3])
         parent = self.tree.get(b[1])
         # if B has a parent, change its left/right child from and update parent of A
         if parent:
@@ -192,11 +189,11 @@ class AVLTree:
             b[2] = beta[0]
             beta[1] = b[0]
         else:
-            b[3] = None
-
+            b[2] = None
+        # update A to B links
         b[1] = a[0]
         a[3] = b[0]
-        # update heights of B then A
+        # update heights of B then A (B is child)
         self.update_height(b)
         self.update_height(a)
 
@@ -242,7 +239,6 @@ class AVLTree:
                 # 2 children - get successor and replace
                 if node[3]:
                     succ = self.successor(node)
-                    print("succ", succ)
                     succ_par = self.tree.get(succ[1])
                     succ_child = self.tree.get(succ[3])
                     # successor has a right child
@@ -265,11 +261,11 @@ class AVLTree:
                         modify_parent(self, succ)
                     # successor has no child
                     else:
-                        # update deleted nodes parent link
-                        modify_parent(self, succ)
                         # update left child link
                         succ[2] = left[0]
                         left[1] = succ[0]
+                        # update deleted nodes parent link
+                        modify_parent(self, succ)
                         # if successor was right child of deleted node, we are done, otherwise must update right child
                         # and parent of the successor
                         if succ_par != node:
@@ -279,30 +275,32 @@ class AVLTree:
                     node = succ
                 # one (left) child
                 else:
-                    # update deleted nodes parent link
+                    # update deleted node's parent's link
                     modify_parent(self, left)
-                    node = left
+                    parent = self.tree.get(left[1])
+                    node = parent
             else:
                 # only one (right) child
                 if node[3]:
                     right = self.tree[node[3]]
                     # update deleted nodes parent link
                     modify_parent(self, right)
-                    node = right
+                    parent = self.tree.get(right[1])
+                    node = parent
                 # 0 children
                 else:
                     # update deleted nodes parent link
                     modify_parent(self, [None, None])
-                    node = None
+                    node = parent
             # delete item from dict
-            self.tree.__delitem__(item)
-        # rebalance the tree
+            del self.tree[item]
+        # rebalance the tree starting from parent of the node we used as a replacement
         self.rebalance(node)
 
     # return the index the given item would be placed in a sorted array of the items in the tree
     def rank(self, item):
-        # TODO: find items place in tree, then climb up tree to root counting number of nodes smaller than item by
-        #  looking at parent size + left child at each step up we moved to a parent with a smaller value
+        # find items place in tree, then climb up tree to root counting number of nodes smaller than item by
+        # looking at parent size + left child at each step up we moved to a parent with a smaller value
         count = 0
         node, flag = self.search(item)
         parent = None
@@ -315,7 +313,7 @@ class AVLTree:
             parent = self.tree.get(node[1])
 
         while parent:
-            # only count if we move up to a parent that is less than node
+            # only count if we move up to a parent that is less than node (will be less than item too)
             if parent[0] < node[0]:
                 count += parent[6]
                 left = self.tree.get(parent[2])
@@ -332,8 +330,8 @@ class AVLTree:
     def successor(self, node):
         # if we have a right subtree, find minimum in that tree
         right = self.tree.get(node[3])
-        current = node
         if right:
+            current = right
             # succ = self.search(node[0] + 1)  # shortcut
             left = self.tree.get(right[2])
             while left:
@@ -341,9 +339,9 @@ class AVLTree:
                 left = self.tree.get(current[2])
             return current
         else:
+            current = node
             # if no right subtree, must move up to parents until root or until a parent is greater than current node
             # to get the next highest node
-            # TODO: check this
             parent = self.tree.get(node[1])
             if not parent:
                 return None
@@ -357,17 +355,70 @@ class AVLTree:
 
 
 def test():
-    # TODO: need to check different conditions for rotations, successor, rank, insert, remove
-    array = [1, 2, 3, 4, 3, 3, 5, 6, 7, 1, 2, 4]
-    tree = AVLTree(array)
+    # Check different conditions for rotations, successor, rank, insert, remove
+
+    # insert
+    test_array = [8, 3, 13, 2, 6, 11, 14, 1, 5, 7, 9, 12, 15, 4, 10]
+    tree = AVLTree(test_array)
     print(tree.tree)
-    print(tree.rank(4))
-    tree.remove(4)
-    tree.remove(3)
-    print(tree.tree)
-    tree.remove(4)
-    print(tree.root)
-    print(tree.tree)
+    tree2 = AVLTree()
+    for x in test_array:
+        tree2.insert(x)
+    print("same tree?", tree.tree == tree2.tree)
+
+    # rotation
+    # right unbalanced - right child right rotate then node left rotate
+    array = [4, 2, 9, 1, 3, 7, 10, 6, 8, 11, 5]
+    tree2 = AVLTree(array)
+    print("tree2:", tree2.tree)
+
+    # successor
+    for x in [1,3,6,7,8,13,15]:
+        print(x)
+        print(tree.successor(tree.tree.get(x)))
+
+    # rank
+    for x in [0,1,4,6,8,10,15,16]:
+        print(tree.rank(x))
+    # add duplicates
+    for x in [1,1,4,6,10,10,15,15]:
+        tree.insert(x)
+    print()
+    for x in [0,1,4,6,8,10,15,16]:
+        print(tree.rank(x))
+
+    # remove
+    array = [8, 3, 13, 2, 6, 11, 16, 1, 5, 7, 9, 12, 15, 18, 4, 10, 14, 17, 19, 20]
+    tree3 = AVLTree(array)
+    print(tree3.tree)
+    print()
+    tree3.remove(8)
+    print(tree3.tree)
+    print()
+    tree3.remove(20)
+    print(tree3.tree)
+    array += [20,20,10,10,10,13]
+    tree3 = AVLTree(array)
+    tree3.remove(20)
+    tree3.remove(8)
+    print(tree3.tree)
+    # extra tests for all conditions of remove
+    array = [8, 3, 13, 2, 6, 11, 14, 1, 5, 7, 9, 12, 15, 4, 10]
+    print('remove')
+    tree3 = AVLTree(array)
+    tree3.remove(13)
+    print(tree3.tree)
+    tree3 = AVLTree(array)
+    tree3.remove(6)
+    print(tree3.tree)
+    tree3 = AVLTree(array)
+    tree3.remove(3)
+    print(tree3.tree)
+    tree3 = AVLTree(array)
+    tree3.remove(9)
+    print(tree3.tree)
+    tree3.remove(2)
+    print(tree3.tree)
 
 
 test()
