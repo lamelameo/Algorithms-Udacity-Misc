@@ -9,7 +9,7 @@ import random
 import itertools
 import math
 import time
-import queue
+from collections import deque
 from AVLTree import AVLTree
 from SparseTable import SparseTable
 
@@ -163,13 +163,13 @@ def test():
 
     # TODO: check number of items in list <= sqrt max then run appropriate algo
     ary = [1]
-    for _ in range(5000):
+    for _ in range(10000):
         ary.append(random.randint(1000000, 1000000000))
-        # ary.append(random.randint(1, 30000))
-    for _ in range(5000):
-        # ary.append(random.randint(1000000, 1000000000))
         ary.append(random.randint(1, 30000))
-    # ary = [random.randint(1, 1000000000) for _ in range(10000)]
+    # for _ in range(5000):
+        # ary.append(random.randint(1000000, 1000000000))
+        # ary.append(random.randint(1, 30000))
+    # ary = [random.randint(1, 1000000000) for _ in range(100000)]
 
     # TODO: input array which guarantees max value is in middle of each sub array at all depths
     # ary.sort()
@@ -201,12 +201,17 @@ def test():
             recurse(mid + 1, end)
 
     # recurse(0, 9999)
+    # timer = time.clock()
+    # print("\npairs:", simple_pairs(ary))
+    # print("time:", time.clock() - timer)
     timer = time.clock()
-    print("\npairs:", simple_pairs(ary))
+    print("\npairs iterated tree:", iterated_tree(ary))
     print("time:", time.clock() - timer)
+    print()
     timer = time.clock()
     print("\npairs iterated:", iterated(ary))
     print("time:", time.clock() - timer)
+    print()
     timer = time.clock()
     print("\npairs recursive:", recursive(ary, 0, len(ary) - 1))
     print("time:", time.clock() - timer)
@@ -291,10 +296,10 @@ def avl_scan(array):
 
 
 # O(n(logn)^2) solution (with AVL tree, O(n^2) with array?)
-count = 0
-counter1 = 0
-counter2 = 0
+count, counter1, counter2 = 0, 0, 0
 def recursive(array, start, end):
+    if not array:
+        return 0
     global count, counter1, counter2
     size_ = end - start + 1
     # find max, determine number of pairs and recurse on sub arrays on either side of the max, then add
@@ -350,11 +355,13 @@ def recursive(array, start, end):
             pairs += binary_search(left, 1)
             pairs += binary_search(right, 1)
 
-        # recurse on left and right sub arrays if they exist
-        if left:
+        # recurse on left and right sub arrays if they exist, recursing on the smaller first
+        if left > right:
             pairs += recursive(array, start, max_ind-1)
-        if right:
             pairs += recursive(array, max_ind+1, end)
+        else:
+            pairs += recursive(array, max_ind + 1, end)
+            pairs += recursive(array, start, max_ind - 1)
         # print("max:", max_x, "pairs:", pairs)
         return pairs
 
@@ -364,13 +371,14 @@ def recursive(array, start, end):
         return 0
 
 
+# iterated version of recursive algorithm, so we dont get stack overflow when we get bad case arrangement of maximums
 def iterated(array):
     pairs = 0
-    iterations = queue.Queue()
-    iterations.put((0, len(array) - 1))
+    iterations = deque()
+    iterations.append((0, len(array) - 1))
     # we will need to loop over all items only once in order dictated by recursive algo
-    while iterations.qsize():
-        start, end = iterations.get_nowait()
+    while iterations:
+        start, end = iterations.pop()
         max_x = 0
         max_ind = 0
         # find the max of the sub array then split into left and right sections
@@ -396,10 +404,212 @@ def iterated(array):
             pairs += binary_search(right, 1)
         # add left and right sub arrays to recursion queue if they exist
         if left:
-            iterations.put((start, max_ind - 1))
+            iterations.append((start, max_ind - 1))
         if right:
-            iterations.put((max_ind + 1, end))
+            iterations.append((max_ind + 1, end))
     return pairs
+
+
+# TODO: can we do a sweep first to find where at the maxes are and then create appropriately sized dicts?
+#   OR: create and destroy both left and right trees each "recursion" rather than storing them in array/dict?
+#      except this is O(n^2logn) for the case we are tryign to improve
+# iterated algorithm using trees instead of array, makes the worst case of iteration using arrays better
+# ie when array is in reverse sorted order or close to this.
+# this algorithm is faster in this case, but 10x slower for average orderings of maximums where we get logn recursions
+def iterated_tree(array):
+    # TODO: need to keep index in unsorted array in tree nodes, this is so we can recurse once we find max
+    #  2d tree with index as 2nd axis? no size attribute - use index for order?
+    #  we cant discriminate position of duplicate values currently
+    #  Use dict to map item to index instead?
+    pairs = 0
+    tree_num = 0
+    # index of each item in unsorted array is mapped to its value in dict, handling duplicates with a list
+    indexes = dict()
+    for index, item in enumerate(array):
+        entry = indexes.get(item)
+        if entry:
+            entry.append(index)
+        else:
+            indexes[item] = [index]
+    iterations = deque()
+    trees = [AVLTree(array)]
+    iterations.append((0, 0, len(array) - 1))
+    # we will need to loop over all items only once in order dictated by recursive algo
+    while iterations:
+        # print("queue:", iterations)
+        # print("trees:", [tree.tree for tree in trees])
+        tree_ind, start, end = iterations.pop()
+        # get the max of the sub array then split into left and right trees
+        tree = trees[tree_ind]
+        # print("\ntree:", tree.tree.keys())
+        max_x = tree.max()
+        tree.remove(max_x)
+        # get the max index in un
+        # sorted array, must check the list if there are duplicates
+        max_ind = 0
+        maxes = indexes[max_x]
+        for x in maxes:
+            if start <= x <= end:
+                max_ind = x
+                break
+        tree2 = AVLTree()
+        # print("max:", max_x)
+        # construct right and left by scanning smaller side and removing these values and placing into new tree
+        if (end - max_ind) <= (max_ind - start):
+            flag = True
+            # max is closer to end than start, tree = left, tree2 = right
+            for x in array[max_ind+1: end+1]:
+                # print("x:", x)
+                tree.remove(x)
+                tree2.insert(x)
+        else:
+            flag = False
+            # tree = right, tree2 = left
+            for x in array[start: max_ind]:
+                tree.remove(x)
+                tree2.insert(x)
+        # print("tree:", tree.tree.keys(), "\ntree2:", tree2.tree.keys())
+        # print(tree.tree)
+        # TODO: bug is due to children attribute not being updated properly
+        # in either case tree2 is smaller, so scan it and find number of pairs
+        for i in tree2.tree:
+            mult = int(max_x / i)
+            # print("i:", i, "max/i:", mult)
+            # print("pairs:", tree.rank(mult))
+            # must take into account duplicates as they are stored in one tree item
+            pairs += tree.rank(mult) * tree2.tree.get(i)[6]
+        # handle pairs of the sort; (1, max) or (max, 1) and (max=1, i) or (i, max=1)
+        if max_x == 1:
+            pairs += tree.size + tree2.size
+        else:  #
+            if tree.size > 0:
+                pairs += tree.rank(1)
+            if tree2.size > 0:
+                pairs += tree2.rank(1)
+        # add left and right trees to recursion queue if they exist, add small tree last, so we recurse on them first
+        # to limit queue size
+
+        # flag = True if tree = left
+        # larger tree is non zero
+        if tree.size > 0:
+            # is left tree
+            if flag:
+                # print('left big:', tree.tree)
+                iterations.append((tree_ind, start, max_ind - 1))
+            # is right tree
+            else:
+                # print('right big:', tree.tree)
+                iterations.append((tree_ind, max_ind + 1, end))
+        # smaller tree is non zero
+        if tree2.size > 0:
+            tree_num += 1
+            trees.append(tree2)
+            # is right tree
+            if flag:
+                # print('right small:', tree2.tree)
+                iterations.append((tree_num, max_ind + 1, end))
+            # is left tree
+            else:
+                # print('left small:', tree2.tree)
+                iterations.append((tree_num, start, max_ind - 1))
+
+    return pairs
+
+
+def test_2():
+    array = [1]
+    # # for _ in range(10):
+    # #     array.append(random.randint(2, 1000))
+    # for _ in range(10):
+    #     array.append(random.randint(1, 100))
+    # # array.append(1)
+    # array = [2, 2, 61, 21, 5, 58, 78, 13, 20, 26]
+    # print(iterated_tree(array))
+    # print(simple_pairs(array))
+    #
+    # flag = True
+    # x, y = 1, 1
+    # while x == y:
+    #     array = []
+    #     for _ in range(10):
+    #         array.append(random.randint(1, 100))
+    #     x = iterated_tree(array)
+    #     y = simple_pairs(array)
+    #
+    # print(array)
+    file = open("..\\..\\learning\\array2testdata.txt")
+    string = ""
+    array = []
+    for line in file:
+        string += line
+    file.close()
+    num = ""
+    for letter in string:
+        if letter == " ":
+            array.append(int(num))
+            num = ""
+        else:
+            num += letter
+
+    timer = time.clock()
+    print("\npairs iterated tree:", iterated_tree(array))
+    print("time:", time.clock() - timer)
+    quit()
+
+
+test_2()
+
+
+# def recursive_tree(tree):
+#     size_ = end - start + 1
+#     # find max, determine number of pairs and recurse on sub arrays on either side of the max, then add
+#     if size_ > 1:
+#         pairs = 0
+#         max_x = 0
+#         max_ind = 0
+#         # get max then split into left and right sub arrays
+#         for index in range(start, end + 1):
+#             count += 1
+#             if array[index] > max_x:
+#                 max_x = array[index]
+#                 max_ind = index
+#         # determine number of pairs using left and right sub arrays
+#         count += size_ - 1
+#         count += 2 * size_ * math.log2(size_ + 1)
+#         left = [x for x in array[start: max_ind]]
+#         right = [x for x in array[max_ind + 1: end + 1]]
+#         # print("l,r", left, right)
+#         left.sort()
+#         right.sort()
+#         count += len(left) * math.log2(len(right) + 1)
+#
+#         # scan smaller sub array of left or right and binary search other array for pairs
+#         (scan, match) = (left, right) if left <= right else (right, left)
+#         for i in scan:
+#             mult = max_x / i
+#             pairs += binary_search(match, mult)
+#         # handle pairs of the sort; (1, max) or (max, 1) and (max=1, i) or (i, max=1)
+#         if max_x == 1:
+#             # print('test', left, right)
+#             pairs += len(right)
+#             pairs += len(left)
+#         else:  # if left or right is None then binary search will return 0
+#             count += math.log2(len(left) + 1) + math.log2(len(right) + 1)
+#             pairs += binary_search(left, 1)
+#             pairs += binary_search(right, 1)
+#
+#         # recurse on left and right sub arrays if they exist
+#         if left:
+#             pairs += recursive(array, start, max_ind - 1)
+#         if right:
+#             pairs += recursive(array, max_ind + 1, end)
+#         # print("max:", max_x, "pairs:", pairs)
+#         return pairs
+#
+#     # sub array of size 1 or 0 has no further pairs
+#     else:
+#         count += 1
+#         return 0
 
 
 test()

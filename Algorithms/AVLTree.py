@@ -27,12 +27,11 @@ class AVLTree:
         self.size = 0
         # we have been given an array to convert to a tree
         if array:
-            self.root = array[0]
-            self.tree[array[0]] = [array[0], None, None, None, 0, 0, 1]
-            for item in array[1:]:
+            for item in array:
                 self.insert(item)
 
     # return a string representation of the tree, successive line representing successive heights
+    # TODO: implement this
     def __str__(self):
         tree = ""
         queue = [self.root]
@@ -41,7 +40,7 @@ class AVLTree:
             while True:
                 break
 
-        return tree
+        return "not implemented"
 
     # find the parent node to which the item should be attached, or the item's node if it already exists
     # return a tuple, tuple[0] is the node key and tuple[1] is 1 or 0 representing item node or parent node
@@ -111,9 +110,7 @@ class AVLTree:
         # update height attribute
         node[4] = 1 + max(self.height(left), self.height(right))
 
-    # TODO: need to deal with changes to root node in rebalance, l/r rotate, delete
-
-    # (key, parent, left, right, height, children, size)
+    #
     def rebalance(self, node):
         while node:
             # update height first
@@ -259,6 +256,7 @@ class AVLTree:
                         left[1] = succ[0]
                         # update deleted nodes parent link
                         modify_parent(self, succ)
+                        node = succ_child
                     # successor has no child
                     else:
                         # update left child link
@@ -272,29 +270,28 @@ class AVLTree:
                             succ[3] = node[3]
                             self.tree[node[3]][1] = succ[0]
                             succ_par[2] = None
-                    node = succ
+                            node = succ_par
+                        else:
+                            node = succ
                 # one (left) child
                 else:
                     # update deleted node's parent's link
                     modify_parent(self, left)
-                    parent = self.tree.get(left[1])
-                    node = parent
             else:
                 # only one (right) child
                 if node[3]:
                     right = self.tree[node[3]]
                     # update deleted nodes parent link
                     modify_parent(self, right)
-                    parent = self.tree.get(right[1])
-                    node = parent
                 # 0 children
                 else:
                     # update deleted nodes parent link
                     modify_parent(self, [None, None])
                     node = parent
-            # delete item from dict
-            del self.tree[item]
-        # rebalance the tree starting from parent of the node we used as a replacement
+            # delete item from dict or set to None
+            # del self.tree[item]
+            self.tree[item] = None
+        # rebalance the tree starting from lowest node that has been affected
         self.rebalance(node)
 
     # return the index the given item would be placed in a sorted array of the items in the tree
@@ -302,26 +299,17 @@ class AVLTree:
         # find items place in tree, then climb up tree to root counting number of nodes smaller than item by
         # looking at parent size + left child at each step up we moved to a parent with a smaller value
         count = 0
-        node, flag = self.search(item)
-        parent = None
+        node, _ = self.search(item)
         # found item or item larger than insert parent node, count then start loop
-        if flag or (node[0] < item):
-            count += node[6]
-            left = self.tree.get(node[2])
-            if left:
-                count += left[5] + left[6]
-            parent = self.tree.get(node[1])
-
-        while parent:
+        while node:
             # only count if we move up to a parent that is less than node (will be less than item too)
-            if parent[0] < node[0]:
-                count += parent[6]
-                left = self.tree.get(parent[2])
+            if node[0] <= item:
+                count += node[6]
+                left = self.tree.get(node[2])
                 if left:
                     count += left[5] + left[6]
             # update node and parent
-            node = parent
-            parent = self.tree.get(parent[1])
+            node = self.tree.get(node[1])
 
         return count
 
@@ -353,6 +341,17 @@ class AVLTree:
                     break
             return parent
 
+    def max(self):
+        node = self.tree.get(self.root)
+        if not node:
+            return None
+        while True:
+            child = self.tree.get(node[3])
+            if not child:
+                return node[0]
+            else:
+                node = child
+
 
 def test():
     # Check different conditions for rotations, successor, rank, insert, remove
@@ -361,6 +360,7 @@ def test():
     test_array = [8, 3, 13, 2, 6, 11, 14, 1, 5, 7, 9, 12, 15, 4, 10]
     tree = AVLTree(test_array)
     print(tree.tree)
+    print('max', tree.max())
     tree2 = AVLTree()
     for x in test_array:
         tree2.insert(x)
@@ -378,14 +378,21 @@ def test():
         print(tree.successor(tree.tree.get(x)))
 
     # rank
+    print("\nrank")
     for x in [0,1,4,6,8,10,15,16]:
         print(tree.rank(x))
     # add duplicates
     for x in [1,1,4,6,10,10,15,15]:
         tree.insert(x)
-    print()
+    print("duplicates:")
     for x in [0,1,4,6,8,10,15,16]:
         print(tree.rank(x))
+    print("test!!")
+    array = [6,1,10,10,5,5,9]
+    t = AVLTree(array)
+    for x in [0, 0.5, 1, 1.9, 4, 6, 10, 11]:
+        print(t.rank(x))
+    quit()
 
     # remove
     array = [8, 3, 13, 2, 6, 11, 16, 1, 5, 7, 9, 12, 15, 18, 4, 10, 14, 17, 19, 20]
@@ -406,8 +413,10 @@ def test():
     array = [8, 3, 13, 2, 6, 11, 14, 1, 5, 7, 9, 12, 15, 4, 10]
     print('remove')
     tree3 = AVLTree(array)
+    print("size", tree3.size)
     tree3.remove(13)
     print(tree3.tree)
+    print("size", tree3.size)
     tree3 = AVLTree(array)
     tree3.remove(6)
     print(tree3.tree)
@@ -421,4 +430,4 @@ def test():
     print(tree3.tree)
 
 
-test()
+# test()
